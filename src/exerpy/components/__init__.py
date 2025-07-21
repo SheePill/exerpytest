@@ -4,10 +4,12 @@ from .heat_exchanger.condenser import Condenser
 from .heat_exchanger.simple import SimpleHeatExchanger
 from .heat_exchanger.steam_generator import SteamGenerator
 from .helpers.cycle_closer import CycleCloser
+from .helpers.power_bus import PowerBus
 from .nodes.deaerator import Deaerator
 from .nodes.drum import Drum
 from .nodes.flash_tank import FlashTank
 from .nodes.mixer import Mixer
+from .nodes.splitter import Splitter
 from .nodes.storage import Storage
 from .piping.valve import Valve
 from .power_machines.generator import Generator

@@ -242,7 +242,11 @@ class Valve(Component):
             else:
                 A[counter, self.inl[0]["CostVar_index"]["M"]] = 1
                 A[counter, self.outl[0]["CostVar_index"]["M"]] = -1
-            equations[counter] = f"aux_{self.name}_mech_{self.outl[0]['name']}"
+            equations[counter] = {
+                "kind": "aux_equality",
+                "objects": [self.name, self.inl[0]["name"], self.outl[0]["name"]],
+                "property": "c_M"
+            }
             b[counter] = 0
             counter += 1
         else:
@@ -253,7 +257,11 @@ class Valve(Component):
             # --- Chemical cost equation (conditionally added) ---
             A[counter, self.inl[0]["CostVar_index"]["CH"]] = (1 / self.inl[0]["E_CH"] if self.inl[0]["e_CH"] != 0 else 1)
             A[counter, self.outl[0]["CostVar_index"]["CH"]] = (-1 / self.outl[0]["E_CH"] if self.outl[0]["e_CH"] != 0 else -1)
-            equations[counter+1] = f"aux_{self.name}_chem_{self.outl[0]['name']}"
+            equations[counter+1] = {
+                "kind": "aux_equality",
+                "objects": [self.name, self.inl[0]["name"], self.outl[0]["name"]],
+                "property": "c_CH"
+            }
             # Set right-hand side for both rows.
             b[counter] = 0
             counter += 1
@@ -263,7 +271,7 @@ class Valve(Component):
     def dis_eqs(self, A, b, counter, T0, equations, chemical_exergy_enabled=False, all_components=None):
         """
         Constructs the cost equations for a dissipative Valve in ExerPy,
-        distributing the valve’s extra cost difference (C_diff) to all other productive 
+        distributing the valve's extra cost difference (C_diff) to all other productive 
         components (non-dissipative and non-CycleCloser) in proportion to their exergy destruction (E_D)
         and adding an extra overall cost balance row that enforces:
         
@@ -274,7 +282,7 @@ class Valve(Component):
            = -\,\dot Z_{\mathrm{costs}}
 
         In this formulation, the unknown cost variable in the "dissipative" column (i.e. C_diff)
-        is solved for, ensuring the valve’s cost balance.
+        is solved for, ensuring the valve's cost balance.
         
         Parameters
         ----------
@@ -311,7 +319,11 @@ class Valve(Component):
             A[counter, self.inl[0]["CostVar_index"]["T"]] = 1
             A[counter, self.outl[0]["CostVar_index"]["T"]] = -1
         b[counter] = 0
-        equations[counter] = f"diss_valve_thermal_{self.name}"
+        equations[counter] = {
+                "kind": "dis_equality",
+                "objects": [self.name, self.inl[0]["name"], self.outl[0]["name"]],
+                "property": "c_T"
+            }
         counter += 1
 
         # --- Mechanical difference row ---
@@ -322,18 +334,24 @@ class Valve(Component):
             A[counter, self.inl[0]["CostVar_index"]["M"]] = 1
             A[counter, self.outl[0]["CostVar_index"]["M"]] = -1
         b[counter] = 0
-        equations[counter] = f"diss_valve_mechanical_{self.name}"
+        equations[counter] = {
+                "kind": "dis_equality",
+                "objects": [self.name, self.inl[0]["name"], self.outl[0]["name"]],
+                "property": "c_M"
+            }
         counter += 1
 
         # --- Distribution of dissipative cost difference to other components based on E_D ---
         if all_components is None:
             all_components = []
         # Serving components: all productive components (excluding self, any dissipative, and CycleCloser)
-        serving = [comp for comp in all_components 
-                if comp is not self 
-                and not getattr(comp, "dissipative", False) 
-                and comp.__class__.__name__ != "CycleCloser"]
-        total_E_D = sum(getattr(comp, "E_D", 0) for comp in serving)
+        serving = [comp for comp in all_components
+                if comp is not self
+                and hasattr(comp, "exergy_cost_line")
+                and not comp.__class__.__name__.endswith("PowerBus")
+                and hasattr(comp, "E_D")
+                and not np.isnan(comp.E_D)]
+        total_E_D = sum(comp.E_D for comp in serving)
         diss_col = self.inl[0]["CostVar_index"].get("dissipative")
         if diss_col is None:
             logging.warning(f"No 'dissipative' column allocated for {self.name}.")
@@ -357,14 +375,18 @@ class Valve(Component):
         # Subtract the unknown dissipative cost difference:
         A[counter, self.inl[0]["CostVar_index"]["dissipative"]] = -1
         b[counter] = -self.Z_costs
-        equations[counter] = f"diss_valve_balance_{self.name}"
+        equations[counter] = {
+                "kind": "dis_balance",
+                "objects": [self.name],
+                "property": "dissipative_cost_balance"
+            }
         counter += 1
 
         return A, b, counter, equations
 
 
 
-    def exergoeconomic_balance(self, T0):
+    def exergoeconomic_balance(self, T0, chemical_exergy_enabled=False):
         """
         Perform exergoeconomic balance calculations for the valve.
         
@@ -379,6 +401,8 @@ class Valve(Component):
         ----------
         T0 : float
             Ambient temperature
+        chemical_exergy_enabled : bool, optional
+            If True, chemical exergy is considered in the calculations.
             
         Notes
         -----

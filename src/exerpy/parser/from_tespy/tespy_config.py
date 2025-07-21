@@ -20,6 +20,9 @@ EXERPY_TESPY_MAPPINGS = {
     "Motor": "Motor",
     "Drum": "Drum",
     "CycleCloser": "CycleCloser",
+    "Splitter": "Splitter",
+    "DropletSeparator": "FlashTank",
+    "PowerBus": "PowerBus",
 }
 """
 This is the mapping of component groups to their name in TESPy:
@@ -45,5 +48,8 @@ This is the mapping of component groups to their name in TESPy:
     - "Motor": "Motor",
     - "Drum": "Drum",
     - "CycleCloser": "CycleCloser",
+    - "Splitter": "Splitter",
+    - "DropletSeparator": "FlashTank",
+    - "PowerBus": "PowerBus",
 
 """

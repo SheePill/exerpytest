@@ -210,6 +210,11 @@ class CombustionChamber(Component):
         else:  # pressure can only decrease in the combustion chamber (case with p_inlet = p0 and p_outlet < p0 NOT considered)
             A[counter, outlets[0]["CostVar_index"]["M"]] = 1
         equations[counter] = f"aux_mixing_mech_{self.outl[0]['name']}"
+        equations[counter] = {
+            "kind": "aux_mixing",
+            "objects": [self.name, self.inl[0]["name"], self.inl[1]["name"], self.outl[0]["name"]],
+            "property": "c_M"
+        }
 
         # --- Chemical cost auxiliary equation ---
         if (outlets[0]["e_CH"] != 0 and inlets[0]["e_CH"] != 0 and inlets[1]["e_CH"] != 0):
@@ -220,7 +225,11 @@ class CombustionChamber(Component):
             A[counter+1, inlets[0]["CostVar_index"]["CH"]] = 1
         elif inlets[1]["e_CH"] == 0:
             A[counter+1, inlets[1]["CostVar_index"]["CH"]] = 1
-        equations[counter+1] = f"aux_mixing_chem_{self.outl[0]['name']}"
+        equations[counter] = {
+            "kind": "aux_mixing",
+            "objects": [self.name, self.inl[0]["name"], self.inl[1]["name"], self.outl[0]["name"]],
+            "property": "c_CH"
+        }
 
         # Set the right-hand side entries to zero.
         b[counter]   = 0
@@ -228,7 +237,7 @@ class CombustionChamber(Component):
 
         return [A, b, counter + 2, equations]
 
-    def exergoeconomic_balance(self, T0):
+    def exergoeconomic_balance(self, T0, chemical_exergy_enabled=False):
         r"""
         Perform exergoeconomic cost balance for the combustion chamber.
 
@@ -257,6 +266,8 @@ class CombustionChamber(Component):
         ----------
         T0 : float
             Ambient temperature (K).
+        chemical_exergy_enabled : bool, optional
+            If True, chemical exergy is considered in the calculations.
         """
         self.C_P = self.outl[0]["C_T"] - (
                 self.inl[0]["C_T"] + self.inl[1]["C_T"]

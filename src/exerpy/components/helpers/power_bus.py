@@ -7,9 +7,9 @@ from exerpy.components.component import component_registry
 
 
 @component_registry
-class CycleCloser(Component):
+class PowerBus(Component):
     r"""
-    Component for closing cycles. This component is not considered in exergy analysis, but it is used in exergoeconomic analysis.
+    Component for power busses. This component is not considered in exergy analysis, but it is used in exergoeconomic analysis.
     """
     def __init__(self, **kwargs):
         r"""Initialize CycleCloser component with given parameters."""
@@ -17,7 +17,7 @@ class CycleCloser(Component):
 
     def calc_exergy_balance(self, T0: float, p0: float, split_physical_exergy) -> None:
         r"""
-        The CycleCloser component does not have an exergy balance calculation.
+        The PowerBus component does not have an exergy balance calculation.
         """      
         self.E_D = np.nan
         self.E_F = np.nan
@@ -71,32 +71,25 @@ class CycleCloser(Component):
         equations : list or dict
             Updated structure with equation labels.
         """
-        # Mechanical cost equality equation:
-        A[counter, self.inl[0]["CostVar_index"]["M"]] = (1 / self.inl[0]["e_M"]) if self.inl[0]["e_M"] != 0 else 1
-        A[counter, self.outl[0]["CostVar_index"]["M"]] = (-1 / self.outl[0]["e_M"]) if self.outl[0]["e_M"] != 0 else -1
-        equations[counter] = {
-                "kind": "aux_equality",
-                "objects": [self.name, self.inl[0]["name"], self.outl[0]["name"]],
-                "property": "c_M"
-            }
-        b[counter] = 0
+        if len(self.outl) <= 1:
+            return A, b, counter, equations
 
-        # Thermal cost equality equation:
-        A[counter+1, self.inl[0]["CostVar_index"]["T"]] = (1 / self.inl[0]["e_T"]) if self.inl[0]["e_T"] != 0 else 1
-        A[counter+1, self.outl[0]["CostVar_index"]["T"]] = (-1 / self.outl[0]["e_T"]) if self.outl[0]["e_T"] != 0 else -1
-        equations[counter+1] = {
-                "kind": "aux_equality",
-                "objects": [self.name, self.inl[0]["name"], self.outl[0]["name"]],
-                "property": "c_T"
+        for out in self.outl[1:]:
+            A[counter, self.inl[0]["CostVar_index"]["TOT"]] = (1 / self.inl[0]["e_TOT"]) if self.inl[0]["e_TOT"] != 0 else 1
+            A[counter, out["CostVar_index"]["TOT"]]           = (-1 / out["e_TOT"])         if out["e_TOT"]         != 0 else -1
+            equations[counter] = {
+                "kind":     "aux_equality",
+                "objects":  [self.name, self.inl[0]["name"], out["name"]],
+                "property": "c_TOT"
             }
-        b[counter+1] = 0
+            b[counter] = 0
+            counter += 1
 
-        counter += 2
         return A, b, counter, equations
     
     def exergoeconomic_balance(self, T0, chemical_exergy_enabled=False) -> None:
         """
-        Exergoeconomic balance for the CycleCloser is not defined.
+        Exergoeconomic balance for the PowerBus is not defined.
 
         This component does not generate or consume exergy, so all cost terms are undefined.
 

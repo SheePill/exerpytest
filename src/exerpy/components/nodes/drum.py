@@ -102,7 +102,11 @@ class Drum(Component):
                 A[counter, self.outl[0]["CostVar_index"]["CH"]] = -1 / self.outl[0]["E_CH"]
             else:
                 A[counter, self.outl[0]["CostVar_index"]["CH"]] = -1
-            equations[counter] = f"aux_drum_chem1_{self.outl[0]['name']}"
+            equations[counter] = {
+                "kind": "aux_equality",
+                "objects": [self.name, self.inl[0]["name"], self.outl[0]["name"]],
+                "property": "c_CH"
+            }
             
             # Equation 2: Balance between inlet 0 and outlet 1 for chemical exergy
             if self.inl[0]["e_CH"] != 0:
@@ -113,7 +117,11 @@ class Drum(Component):
                 A[counter+1, self.outl[1]["CostVar_index"]["CH"]] = -1 / self.outl[1]["E_CH"]
             else:
                 A[counter+1, self.outl[1]["CostVar_index"]["CH"]] = -1
-            equations[counter+1] = f"aux_drum_chem2_{self.outl[1]['name']}"
+            equations[counter+1] = {
+                "kind": "aux_equality",
+                "objects": [self.name, self.inl[1]["name"], self.outl[1]["name"]],
+                "property": "c_CH"
+            }
             chem_rows = 2
         else:
             chem_rows = 0
@@ -130,7 +138,11 @@ class Drum(Component):
         else:
             A[counter+chem_rows, self.outl[0]["CostVar_index"]["T"]] = 1
             A[counter+chem_rows, self.outl[1]["CostVar_index"]["T"]] = -1
-        equations[counter+chem_rows] = f"aux_drum_therm_{self.outl[0]['name']}_{self.outl[1]['name']}"
+        equations[counter+chem_rows] = {
+                "kind": "aux_p_rule",
+                "objects": [self.name, self.outl[0]["name"], self.outl[1]["name"]],
+                "property": "c_T"
+            }
 
         # --- Mechanical cost auxiliary equation ---
         if self.outl[0]["e_M"] != 0:
@@ -141,7 +153,11 @@ class Drum(Component):
             A[counter+chem_rows+1, self.outl[1]["CostVar_index"]["M"]] = -1 / self.outl[1]["E_M"]
         else:
             A[counter+chem_rows+1, self.outl[1]["CostVar_index"]["M"]] = -1
-        equations[counter+chem_rows+1] = f"aux_drum_mech_{self.outl[0]['name']}_{self.outl[1]['name']}"
+        equations[counter+chem_rows+1] = {
+                "kind": "aux_p_rule",
+                "objects": [self.name, self.outl[0]["name"], self.outl[1]["name"]],
+                "property": "c_M"
+            }
 
         # --- Thermal-Mechanical coupling equation for outlet 0 ---
         # This enforces that the thermal and mechanical cost components at outlet 0 are consistent.
@@ -155,7 +171,11 @@ class Drum(Component):
             A[counter+chem_rows+2, self.outl[0]["CostVar_index"]["T"]] = 1
         else:
             A[counter+chem_rows+2, self.outl[0]["CostVar_index"]["M"]] = -1
-        equations[counter+chem_rows+2] = f"aux_drum_therm_mech_{self.outl[0]['name']}"
+        equations[counter+chem_rows+2] = {
+                "kind": "aux_equality",
+                "objects": [self.name, self.outl[0]["name"]],
+                "property": "c_T, c_M"
+            }
 
         # Set the right-hand side entries to zero for all added rows.
         for i in range(chem_rows + 3):

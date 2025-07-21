@@ -227,7 +227,11 @@ class Compressor(Component):
             # Set the chemical cost equality:
             A[counter, self.inl[0]["CostVar_index"]["CH"]] = (1 / self.inl[0]["E_CH"]) if self.inl[0]["e_CH"] != 0 else 1
             A[counter, self.outl[0]["CostVar_index"]["CH"]] = (-1 / self.outl[0]["E_CH"]) if self.outl[0]["e_CH"] != 0 else 1
-            equations[counter] = f"aux_equality_chem_{self.outl[0]['name']}"
+            equations[counter] = {
+                "kind": "aux_equality",
+                "objects": [self.name, self.inl[0]["name"], self.outl[0]["name"]],
+                "property": "c_CH"
+            }
             chem_row = 1
         else:
             chem_row = 0
@@ -245,18 +249,30 @@ class Compressor(Component):
                 A[row_index, self.outl[0]["CostVar_index"]["T"]] = 1 / dET
                 A[row_index, self.inl[0]["CostVar_index"]["M"]] = 1 / dEM
                 A[row_index, self.outl[0]["CostVar_index"]["M"]] = -1 / dEM
-                equations[row_index] = f"aux_p_rule_{self.name}"
+                equations[row_index] = {
+                    "kind": "aux_p_rule",
+                    "objects": [self.name, self.inl[0]["name"], self.outl[0]["name"]],
+                    "property": "c_T, c_M"
+                }
             else:
                 logging.warning("Case where thermal or mechanical exergy difference is zero is not implemented.")
         elif self.inl[0]["T"] <= T0 and self.outl[0]["T"] > T0:
             A[row_index, self.outl[0]["CostVar_index"]["T"]] = 1 / self.outl[0]["E_T"]
             A[row_index, self.inl[0]["CostVar_index"]["M"]] = 1 / dEM
             A[row_index, self.outl[0]["CostVar_index"]["M"]] = -1 / dEM
-            equations[row_index] = f"aux_p_rule_{self.name}"
+            equations[row_index] = {
+                "kind": "aux_p_rule",
+                "objects": [self.name, self.inl[0]["name"], self.outl[0]["name"]],
+                "property": "c_T, c_M"
+            }
         else:
             A[row_index, self.inl[0]["CostVar_index"]["T"]] = -1 / self.inl[0]["E_T"]
             A[row_index, self.outl[0]["CostVar_index"]["T"]] = 1 / self.outl[0]["E_T"]
-            equations[row_index] = f"aux_f_rule_{self.name}"
+            equations[row_index] = {
+                "kind": "aux_f_rule",
+                "objects": [self.name, self.inl[0]["name"], self.outl[0]["name"]],
+                "property": "c_T"
+            }
         
         # Set the right-hand side entry for the thermal/mechanical row to zero.
         b[row_index] = 0
@@ -269,7 +285,7 @@ class Compressor(Component):
 
         return A, b, new_counter, equations
 
-    def exergoeconomic_balance(self, T0):
+    def exergoeconomic_balance(self, T0, chemical_exergy_enabled=False):
         """
         Perform exergoeconomic balance calculations for the compressor.
         
@@ -284,7 +300,8 @@ class Compressor(Component):
         ----------
         T0 : float
             Ambient temperature
-            
+        chemical_exergy_enabled : bool, optional
+            If True, chemical exergy is considered in the calculations.
         Notes
         -----
         The exergoeconomic balance considers thermal (T), chemical (CH),

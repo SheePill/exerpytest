@@ -120,7 +120,7 @@ class Storage(Component):
             f"E_F = {self.E_F:.2f} W, E_P = {self.E_P:.2f} W, E_D = {self.E_D:.2f} W, "
         )
 
-    def exergoeconomic_balance(self, T0):
+    def exergoeconomic_balance(self, T0, chemical_exergy_enabled=False):
         r"""
         This class has not been implemented yet!
         """

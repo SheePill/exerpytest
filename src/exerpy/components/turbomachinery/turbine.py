@@ -234,7 +234,11 @@ class Turbine(Component):
                 A[counter + row_offset, outlet["CostVar_index"]["T"]] = (
                     -1 / outlet["E_T"] if outlet["e_T"] != 0 else -1
                 )
-                equations[counter + row_offset] = f"aux_f_rule_{outlet['name']}"
+                equations[counter + row_offset] = {
+                    "kind": "aux_f_rule",
+                    "objects": [self.name, self.inl[0]["name"], self.outl[0]["name"]],
+                    "property": "c_T"
+                }
 
                 # --- Mechanical exergy equation ---
                 A[counter + row_offset + 1, self.inl[0]["CostVar_index"]["M"]] = (
@@ -243,7 +247,11 @@ class Turbine(Component):
                 A[counter + row_offset + 1, outlet["CostVar_index"]["M"]] = (
                     -1 / outlet["E_M"] if outlet["e_M"] != 0 else -1
                 )
-                equations[counter + row_offset + 1] = f"aux_f_rule_{outlet['name']}"
+                equations[counter + row_offset + 1] = {
+                    "kind": "aux_f_rule",
+                    "objects": [self.name, self.inl[0]["name"], self.outl[0]["name"]],
+                    "property": "c_M"
+                }
 
                 # --- Chemical exergy equation (conditionally added) ---
                 if chemical_exergy_enabled:
@@ -253,7 +261,11 @@ class Turbine(Component):
                     A[counter + row_offset + 2, outlet["CostVar_index"]["CH"]] = (
                         -1 / outlet["E_CH"] if outlet["e_CH"] != 0 else -1
                     )
-                    equations[counter + row_offset + 2] = f"aux_f_rule_{outlet['name']}"
+                    equations[counter + row_offset + 2] = {
+                        "kind": "aux_equality",
+                        "objects": [self.name, self.inl[0]["name"], self.outl[0]["name"]],
+                        "property": "c_CH"
+                    }
             
             # Update counter based on number of rows added for all material outlets.
             num_material_rows = num_rows_per_outlet * len(material_outlets)
@@ -274,12 +286,16 @@ class Turbine(Component):
                 A[counter, ref_idx] = 1 / ref["E"] if ref["E"] != 0 else 1
                 A[counter, cur_idx] = -1 / outlet["E"] if outlet["E"] != 0 else -1
                 b[counter] = 0
-                equations[counter] = f"aux_p_rule_power_{self.name}_{outlet['name']}"
+                equations[counter] = {
+                    "kind": "aux_p_rule",
+                    "objects": [self.name],
+                    "property": "c_TOT (more power flows)"
+                }
                 counter += 1
 
         return A, b, counter, equations
 
-    def exergoeconomic_balance(self, T0):
+    def exergoeconomic_balance(self, T0, chemical_exergy_enabled=False):
         """
         Perform exergoeconomic balance calculations for the turbine.
 
@@ -307,7 +323,8 @@ class Turbine(Component):
         ----------
         T0 : float
             Ambient temperature.
-
+        chemical_exergy_enabled : bool, optional
+            If True, chemical exergy is considered in the calculations.
         Raises
         ------
         ValueError

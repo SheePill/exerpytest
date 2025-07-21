@@ -230,7 +230,11 @@ class Deaerator(Component):
                 # Outlet chemical exergy is zero: assign fallback for all inlets.
                 for inlet in self.inl.values():
                     A[counter, inlet["CostVar_index"]["CH"]] = 1
-            equations[counter] = f"aux_mixing_chem_{self.outl[0]['name']}"
+            equations[counter] = {
+                "kind": "aux_mixing",
+                "objects": [self.name, self.inl[0]["name"], self.inl[1]["name"], self.outl[0]["name"]],
+                "property": "c_CH"
+            }
             chem_row = 1  # One row added for chemical equation.
         else:
             chem_row = 0  # No row added.
@@ -248,7 +252,11 @@ class Deaerator(Component):
         else:
             for inlet in self.inl.values():
                 A[counter + chem_row, inlet["CostVar_index"]["M"]] = 1
-        equations[counter + chem_row] = f"aux_mixing_mech_{self.outl[0]['name']}"
+        equations[counter + chem_row] = {
+            "kind": "aux_mixing",
+            "objects": [self.name, self.inl[0]["name"], self.inl[1]["name"], self.outl[0]["name"]],
+            "property": "c_M"
+        }
 
         # Set the right-hand side entries to zero for the added rows.
         if chemical_exergy_enabled:
@@ -261,7 +269,7 @@ class Deaerator(Component):
 
         return A, b, counter, equations
 
-    def exergoeconomic_balance(self, T0):
+    def exergoeconomic_balance(self, T0, chemical_exergy_enabled=False):
         """
         Perform exergoeconomic balance calculations for the deaerator.
         
@@ -276,7 +284,9 @@ class Deaerator(Component):
         ----------
         T0 : float
             Ambient temperature
-            
+        chemical_exergy_enabled : bool, optional
+            If True, chemical exergy is considered in the calculations.
+
         Notes
         -----
         The exergoeconomic balance considers thermal (T), chemical (CH),

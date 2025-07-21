@@ -516,26 +516,46 @@ class HeatExchanger(Component):
         # Case 1: All temperatures > T0.
         if all([c["T"] > T0 for c in list(self.inl.values()) + list(self.outl.values())]):
             set_thermal_f_hot(A, counter + 0)
-            equations[counter] = f"aux_f_rule_hot_{self.name}"
+            equations[counter] = {
+                "kind": "aux_f_rule_hot",
+                "objects": [self.name, self.inl[0]["name"], self.outl[0]["name"]],
+                "property": "c_T"
+            }
         # Case 2: All temperatures <= T0.
         elif all([c["T"] <= T0 for c in list(self.inl.values()) + list(self.outl.values())]):
             set_thermal_f_cold(A, counter + 0)
-            equations[counter] = f"aux_f_rule_cold_{self.name}"
+            equations[counter] = {
+                "kind": "aux_f_rule_cold",
+                "objects": [self.name, self.inl[1]["name"], self.outl[1]["name"]],
+                "property": "c_T"
+            }
         # Case 3: Both stream crossing T0 (hot inlet and cold outlet > T0, hot outlet and cold inlet <= T0)
         elif (self.inl[0]["T"] > T0 and self.outl[1]["T"] > T0 and
             self.outl[0]["T"] <= T0 and self.inl[1]["T"] <= T0):
             set_thermal_p_rule(A, counter + 0)
-            equations[counter] = f"aux_p_rule_{self.name}"
+            equations[counter] = {
+                "kind": "aux_p_rule",
+                "objects": [self.name, self.outl[0]["name"], self.outl[1]["name"]],
+                "property": "c_T"
+            }
         # Case 4: Only hot inlet > T0
         elif (self.inl[0]["T"] > T0 and self.inl[1]["T"] <= T0 and
             self.outl[0]["T"] <= T0 and self.outl[1]["T"] <= T0):
             set_thermal_f_cold(A, counter + 0)
-            equations[counter] = f"aux_f_rule_cold_{self.name}"
+            equations[counter] = {
+                "kind": "aux_f_rule_cold",
+                "objects": [self.name, self.inl[1]["name"], self.outl[1]["name"]],
+                "property": "c_T"
+            }
         # Case 5: Only cold inlet <= T0
         elif (self.inl[0]["T"] > T0 and self.inl[1]["T"] <= T0 and
             self.outl[0]["T"] > T0 and self.outl[1]["T"] > T0):
             set_thermal_f_hot(A, counter + 0)
-            equations[counter] = f"aux_f_rule_hot_{self.name}"
+            equations[counter] = {
+                "kind": "aux_f_rule_hot",
+                "objects": [self.name, self.inl[0]["name"], self.outl[0]["name"]],
+                "property": "c_T"
+            }
         # Case 6: hot stream always above T0, cold stream always below T0 (dissipative case)
         elif (self.inl[0]["T"] > T0 and self.inl[1]["T"] <= T0 and
             self.outl[0]["T"] > T0 and self.outl[1]["T"] <= T0):
@@ -550,15 +570,31 @@ class HeatExchanger(Component):
         # Mechanical equations (always added)
         set_equal(A, counter + 1, self.inl[0], self.outl[0], "M")
         set_equal(A, counter + 2, self.inl[1], self.outl[1], "M")
-        equations[counter + 1] = f"aux_equality_mech_{self.outl[0]['name']}"
-        equations[counter + 2] = f"aux_equality_mech_{self.outl[1]['name']}"
+        equations[counter+1] = {
+                "kind": "aux_equality",
+                "objects": [self.name, self.inl[0]["name"], self.outl[0]["name"]],
+                "property": "c_M"
+            }
+        equations[counter + 2] = {
+                "kind": "aux_equality",
+                "objects": [self.name, self.inl[1]["name"], self.outl[1]["name"]],
+                "property": "c_M"
+            }
         
         # Only add chemical auxiliary equations if chemical exergy is enabled.
         if chemical_exergy_enabled:
             set_equal(A, counter + 3, self.inl[0], self.outl[0], "CH")
             set_equal(A, counter + 4, self.inl[1], self.outl[1], "CH")
-            equations[counter + 3] = f"aux_equality_chem_{self.outl[0]['name']}"
-            equations[counter + 4] = f"aux_equality_chem_{self.outl[1]['name']}"
+            equations[counter + 3] = {
+                "kind": "aux_equality",
+                "objects": [self.name, self.inl[0]["name"], self.outl[0]["name"]],
+                "property": "c_CH"
+            }
+            equations[counter + 4] = {
+                "kind": "aux_equality",
+                "objects": [self.name, self.inl[1]["name"], self.outl[1]["name"]],
+                "property": "c_M"
+            }
             num_aux_eqs = 5
         else:
             # Skip chemical auxiliary equations.
@@ -569,7 +605,7 @@ class HeatExchanger(Component):
 
         return A, b, counter + num_aux_eqs, equations
 
-    def exergoeconomic_balance(self, T0):
+    def exergoeconomic_balance(self, T0, chemical_exergy_enabled=False):
         r"""
         Perform exergoeconomic cost balance for the heat exchanger.
 
@@ -670,6 +706,8 @@ class HeatExchanger(Component):
         ----------
         T0 : float
             Ambient temperature (K).
+        chemical_exergy_enabled : bool, optional
+            If True, chemical exergy is considered in the calculations.
         """
         # Case 1: All streams are above the ambient temperature
         if all([c["T"] > T0 for c in list(self.inl.values()) + list(self.outl.values())]):

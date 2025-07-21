@@ -139,7 +139,7 @@ class Motor(Component):
         """
         return [A, b, counter, equations]
     
-    def exergoeconomic_balance(self, T0):
+    def exergoeconomic_balance(self, T0, chemical_exergy_enabled=False):
         """
         Perform exergoeconomic balance calculations for the motor.
         
@@ -154,7 +154,8 @@ class Motor(Component):
         ----------
         T0 : float
             Ambient temperature
-            
+        chemical_exergy_enabled : bool, optional
+            If True, chemical exergy is considered in the calculations.
         Notes
         -----
         The exergoeconomic balance considers thermal (T), chemical (CH),

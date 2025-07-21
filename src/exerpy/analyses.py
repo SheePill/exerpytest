@@ -8,6 +8,7 @@ from tabulate import tabulate
 
 from .components.component import component_registry
 from .components.helpers.cycle_closer import CycleCloser
+from .components.helpers.power_bus import PowerBus
 from .functions import add_chemical_exergy
 from .functions import add_total_exergy_flow
 
@@ -642,9 +643,9 @@ def _construct_components(component_data, connection_data, Tamb):
     for component_type, component_instances in component_data.items():
         for component_name, component_information in component_instances.items():
             # Skip components of type 'Splitter'
-            if component_type == "Splitter" or component_information.get('type') == "Splitter":
+            '''if component_type == "Splitter" or component_information.get('type') == "Splitter":
                 logging.info(f"Skipping 'Splitter' component during the exergy analysis: {component_name}")
-                continue  # Skip this component
+                continue  # Skip this component'''
 
             # Fetch the corresponding class from the registry using the component type
             component_class = component_registry.items.get(component_type)
@@ -685,7 +686,7 @@ def _construct_components(component_data, connection_data, Tamb):
                     else:
                         component.is_dissipative = False
                 except Exception as e:
-                    logging.warning(f"Could not evaluate dissipativity for Valve '{component_name}': {e}")
+                    logging.warning(f"Could not evaluate if Valve '{component_name}' is dissipative or not: {e}")
                     component.is_dissipative = False
             else:
                 component.is_dissipative = False
@@ -944,7 +945,7 @@ class ExergoeconomicAnalysis:
                         if comp is not None and getattr(comp, "is_dissipative", False):
                             # Add an extra index for the dissipative cost difference.
                             conn["CostVar_index"]["dissipative"] = col_number
-                            self.variables[str(col_number)] = "dissipative"
+                            self.variables[str(col_number)] = f"dissipative_{comp.name}"
                             col_number += 1
                 # For non-material streams (e.g., heat, power), assign one index.
                 elif kind in ("heat", "power"):
@@ -980,7 +981,7 @@ class ExergoeconomicAnalysis:
         """
         # --- Component Costs ---
         for comp_name, comp in self.components.items():
-            if isinstance(comp, CycleCloser):
+            if isinstance(comp, CycleCloser) or isinstance(comp, PowerBus):
                 continue
             else:
                 cost_key = f"{comp_name}_Z"
@@ -1060,9 +1061,8 @@ class ExergoeconomicAnalysis:
         4. Custom auxiliary equations from each component
         5. Special equations for dissipative components
         """
-        num_vars = self.num_variables
-        A = np.zeros((num_vars, num_vars))
-        b = np.zeros(num_vars)
+        self._A = np.zeros((self.num_variables, self.num_variables))
+        self._b = np.zeros(self.num_variables)
         counter = 0
 
         # Filter out CycleCloser instances, keeping the component objects.
@@ -1080,18 +1080,22 @@ class ExergoeconomicAnalysis:
                     # If the connection's target is the component, it is an inlet (add +1).
                     if conn.get("target_component") == comp.name:
                         for key, col in conn["CostVar_index"].items():
-                            A[counter, col] = 1  # Incoming costs
+                            self._A[counter, col] = 1  # Incoming costs
                     # If the connection's source is the component, it is an outlet (subtract -1).
                     elif conn.get("source_component") == comp.name:
                         for key, col in conn["CostVar_index"].items():
-                            A[counter, col] = -1  # Outgoing costs
-                    self.equations[counter] = f"Z_costs_{comp.name}"  # Store the equation name
+                            self._A[counter, col] = -1  # Outgoing costs
+                    self.equations[counter] = {
+                        "kind": "cost_balance",
+                        "object": [comp.name],
+                        "property": "Z_costs"
+                    }
 
             # For productive components: C_in - C_out = -Z_costs.
             if getattr(comp, "is_dissipative", False):
                 continue
             else:
-                b[counter] = -getattr(comp, "Z_costs", 1)
+                self._b[counter] = -getattr(comp, "Z_costs", 1)
                 counter += 1
 
         # 2. Inlet stream equations.
@@ -1113,15 +1117,23 @@ class ExergoeconomicAnalysis:
                         exergy_terms = ["T", "M"]
                     for label in exergy_terms:
                         idx = conn["CostVar_index"][label]
-                        A[counter, idx] = 1  # Fix the cost variable.
-                        b[counter] = conn.get(f"C_{label}", conn.get("C_TOT", 0))
-                        self.equations[counter] = f"boundary_stream_costs_{name}_{label}"
+                        self._A[counter, idx] = 1  # Fix the cost variable.
+                        self._b[counter] = conn.get(f"C_{label}", conn.get("C_TOT", 0))
+                        self.equations[counter] = {
+                            "kind": "boundary",
+                            "object": [name],
+                            "property": f"c_{label}"
+                        }
                         counter += 1
                 elif kind == "heat":
                     idx = conn["CostVar_index"]["exergy"]
-                    A[counter, idx] = 1
-                    b[counter] = conn.get("C_TOT", 0)
-                    self.equations[counter] = f"boundary_stream_costs_{name}_TOT"
+                    self._A[counter, idx] = 1
+                    self._b[counter] = conn.get("C_TOT", 0)
+                    self.equations[counter] = {
+                        "kind": "boundary",
+                        "object": [name],
+                        "property": "c_TOT"
+                    }      
                     counter += 1
                 elif kind == "power":
                     if not has_power_outlet:
@@ -1129,9 +1141,13 @@ class ExergoeconomicAnalysis:
                         if not conn.get("C_TOT"):
                             continue
                         idx = conn["CostVar_index"]["exergy"]
-                        A[counter, idx] = 1
-                        b[counter] = conn.get("C_TOT", 0)
-                        self.equations[counter] = f"boundary_stream_costs_{name}_TOT"
+                        self._A[counter, idx] = 1
+                        self._b[counter] = conn.get("C_TOT", 0)
+                        self.equations[counter] = {
+                            "kind": "boundary",
+                            "object": [name],
+                            "property": "c_TOT"
+                        }      
                         counter += 1
                     else:
                         continue
@@ -1150,10 +1166,14 @@ class ExergoeconomicAnalysis:
             ref_idx = ref["CostVar_index"]["exergy"]
             for conn in power_conns[1:]:
                 cur_idx = conn["CostVar_index"]["exergy"]
-                A[counter, ref_idx] = 1 / ref["E"] if ref["E"] != 0 else 1
-                A[counter, cur_idx] = -1 / conn["E"] if conn["E"] != 0 else -1
-                b[counter] = 0
-                self.equations[counter] = f"aux_power_eq_{ref['name']}_{conn['name']}"
+                self._A[counter, ref_idx] = 1 / ref["E"] if ref["E"] != 0 else 1
+                self._A[counter, cur_idx] = -1 / conn["E"] if conn["E"] != 0 else -1
+                self._b[counter] = 0
+                self.equations[counter] = {
+                    "kind": "aux_power_eq",
+                    "objects": [ref['name'], conn['name']],
+                    "property": "c_M"
+                }
                 counter += 1
 
         # 4. Auxiliary equations.
@@ -1166,7 +1186,7 @@ class ExergoeconomicAnalysis:
                 if hasattr(comp, "aux_eqs") and callable(comp.aux_eqs):
                     # The aux_eqs function should accept the current matrix, vector, counter, and Tamb,
                     # and return the updated (A, b, counter).
-                    A, b, counter, self.equations = comp.aux_eqs(A, b, counter, Tamb, self.equations, self.chemical_exergy_enabled)
+                    self._A, self._b, counter, self.equations = comp.aux_eqs(self._A, self._b, counter, Tamb, self.equations, self.chemical_exergy_enabled)
                 else:
                     # If no auxiliary equations are provided.
                     logging.warning(f"No auxiliary equations provided for component '{comp.name}'.")
@@ -1179,9 +1199,7 @@ class ExergoeconomicAnalysis:
             if getattr(comp, "is_dissipative", False):
                 if hasattr(comp, "dis_eqs") and callable(comp.dis_eqs):
                     # Let the component provide its own modifications for the cost matrix.
-                    A, b, counter, self.equations = comp.dis_eqs(A, b, counter, Tamb, self.equations, self.chemical_exergy_enabled, list(self.components.values()))
-
-        return A, b
+                    self._A, self._b, counter, self.equations = comp.dis_eqs(self._A, self._b, counter, Tamb, self.equations, self.chemical_exergy_enabled, list(self.components.values()))
 
 
     def solve_exergoeconomic_analysis(self, Tamb):
@@ -1215,11 +1233,13 @@ class ExergoeconomicAnalysis:
         6. Computes system-level cost variables
         """
         # Step 1: Construct the cost matrix
-        exergy_cost_matrix, exergy_cost_vector = self.construct_matrix(Tamb)
+        self.construct_matrix(Tamb)
 
         # Step 2: Solve the system of equations
         try:
-            C_solution = np.linalg.solve(exergy_cost_matrix, exergy_cost_vector)
+            C_solution = np.linalg.solve(self._A, self._b)
+            if np.isnan(C_solution).any():
+                raise ValueError("The solution of the cost matrix contains NaN values, indicating an issue with the cost balance equations or specifications.")
         except np.linalg.LinAlgError:
             raise ValueError(f"Exergoeconomic system is singular and cannot be solved. "
                              f"Provided equations: {len(self.equations)}, variables in system: {len(self.variables)}")
@@ -1267,7 +1287,7 @@ class ExergoeconomicAnalysis:
         # Step 4: Assign C_P, C_F, C_D, and f values to components
         for comp in self.exergy_analysis.components.values():
             if hasattr(comp, "exergoeconomic_balance") and callable(comp.exergoeconomic_balance):
-                comp.exergoeconomic_balance(self.exergy_analysis.Tamb)
+                comp.exergoeconomic_balance(self.exergy_analysis.Tamb, self.chemical_exergy_enabled)
 
         # Step 5: Distribute the cost of loss streams to the product streams.
         # For each loss stream (provided in E_L_dict), its C_TOT is distributed among the product streams (in E_P_dict)
@@ -1347,11 +1367,10 @@ class ExergoeconomicAnalysis:
         # Check cost balance and raise error if violated
         if abs(self.system_costs["C_P"] - self.system_costs["C_F"] - self.system_costs["Z"]) > 1e-4:
             raise ValueError(
-                f"Exergoeconomic cost balance not satisfied: C_P ({self.system_costs['C_P']:.6f}) ≠ "
+                f"Exergoeconomic cost balance of the entire system is not satisfied: C_P ({self.system_costs['C_P']:.6f}) ≠ "
                 f"C_F ({self.system_costs['C_F']:.6f}) + Z ({self.system_costs['Z']:.6f})"
             )
 
-        return exergy_cost_matrix, exergy_cost_vector
 
     def run(self, Exe_Eco_Costs, Tamb):
         """
@@ -1377,6 +1396,114 @@ class ExergoeconomicAnalysis:
         self.assign_user_costs(Exe_Eco_Costs)
         self.solve_exergoeconomic_analysis(Tamb)
         logging.info(f"Exergoeconomic analysis completed successfully.")
+
+
+    def print_equations(self):
+        """
+        Get mapping of equation indices to equation descriptions.
+
+        Returns
+        -------
+        dict
+            Keys are equation indices (int), values are equation descriptions (str).
+        """
+        return {i: self.equations[i] for i in sorted(self.equations)}
+
+
+    def print_variables(self):
+        """
+        Get mapping of variable indices to variable names.
+
+        Returns
+        -------
+        dict
+            Keys are variable indices (int), values are variable names (str).
+        """
+        return {int(k): v for k, v in self.variables.items()}
+    
+
+    def detect_linear_dependencies(self,
+                                   tol_strict: float = 1e-12,
+                                   tol_near:   float = 1e-8):
+        """
+        Scan A for zero-rows, zero-cols, exactly colinear equation pairs
+        (error ≤ tol_strict), and near-colinear pairs (≤ tol_near but > tol_strict).
+        """
+        A = self._A
+
+        # 1) empty rows/cols
+        zero_rows = np.where((np.abs(A) < tol_strict).all(axis=1))[0].tolist()
+        zero_cols = np.where((np.abs(A) < tol_strict).all(axis=0))[0].tolist()
+
+        # 2) norms once
+        norms = np.linalg.norm(A, axis=1)
+
+        strict = []
+        near   = []
+        n = A.shape[0]
+        for i in range(n):
+            for j in range(i+1, n):
+                ni, nj = norms[i], norms[j]
+                if ni > tol_strict and nj > tol_strict:
+                    dot = float(np.dot(A[i], A[j]))
+                    diff = abs(dot - ni*nj)
+                    if diff <= tol_strict:
+                        strict.append((i, j))
+                    elif diff <= tol_near:
+                        near.append((i, j))
+
+        # drop any strict pairs from the near list
+        near_only = [pair for pair in near if pair not in strict]
+
+        return {
+            'zero_rows': zero_rows,
+            'zero_columns': zero_cols,
+            'colinear_equations_strict': strict,
+            'colinear_equations_near_only': near_only
+        }
+
+
+    def print_dependency_report(self,
+                                tol_strict: float = 1e-12,
+                                tol_near:   float = 1e-8):
+        """
+        Nicely print which equations or variables are under- or over-determined,
+        distinguishing exact vs. near colinearities.
+        """
+        deps = self.detect_linear_dependencies(tol_strict, tol_near)
+
+        # empty equations
+        if deps['zero_rows']:
+            print("⚠ Equations with no variables:")
+            for eq in deps['zero_rows']:
+                print(f"  • Eq[{eq}]: {self.equations.get(eq)}")
+        else:
+            print("✓ No empty equations.")
+
+        # unused variables
+        if deps['zero_columns']:
+            print("\n⚠ Variables never used in any equation:")
+            for var in deps['zero_columns']:
+                name = self.variables.get(str(var))
+                print(f"  • Var[{var}]: {name}")
+        else:
+            print("✓ All variables appear in at least one equation.")
+
+        # exactly colinear
+        if deps['colinear_equations_strict']:
+            print("\n⚠ Exactly colinear (redundant) equation pairs:")
+            for i, j in deps['colinear_equations_strict']:
+                print(f"  • Eq[{i}] {self.equations[i]!r}  ≈  Eq[{j}] {self.equations[j]!r}")
+        else:
+            print("✓ No exactly colinear equation pairs detected.")
+
+        # near-colinear
+        if deps['colinear_equations_near_only']:
+            print("\n⚠ Nearly colinear equation pairs (|dot−‖i‖‖j‖| ≤ tol_near):")
+            for i, j in deps['colinear_equations_near_only']:
+                print(f"  • Eq[{i}] {self.equations[i]!r}  ≈? Eq[{j}] {self.equations[j]!r}")
+        else:
+            print("✓ No near-colinear equation pairs detected.")
 
 
     def exergoeconomic_results(self, print_results=True):

@@ -108,7 +108,7 @@ class Component:
             return self.E_P / self.E_F
         
 
-    def exergoeconomic_balance(self, T0):
+    def exergoeconomic_balance(self, T0, chemical_exergy_enabled=False):
         r"""
         Placeholder method for exergoeconomic balance.
 
@@ -121,6 +121,8 @@ class Component:
         ----------
         T0 : float
             Ambient temperature in :math:`\mathrm{K}`.
+        chemical_exergy_enabled : bool, optional
+            If True, chemical exergy is considered in the calculations.
         """
         return
 
