@@ -44,7 +44,7 @@ To address these needs ExerPy provides a Python-based solution that automates ex
 
 ExerPy is designed to perform exergy analysis through a structured workflow that integrates seamlessly with simulation tools. The initial implementation supports Ebsilon Professional®, Aspen Plus®, and TESPy. The framework is divided into two main modules: the data processing module, which manages the extraction and preparation of simulation data, and the exergy analysis module, which conducts the detailed exergy calculations. This modular design enhances flexibility and allows users to evaluate systems of varying complexity. The architecture is outlined in the following sections and is shown in \autoref{fig:structure}.
 
-![Structure of the ExerPy framework.\label{fig:structure}](exerpy_vertical.svg)
+![Structure of the ExerPy framework.\label{fig:structure}](exerpy_vertical.svg){#sylt width="100%"}
 
 ### Data processing 
 
@@ -64,7 +64,7 @@ The framework performs exergy analysis at both the component and system levels. 
 # Use Case and validation
 
 
-![Flow sheet of the combined cycle power plant.\label{fig:ccpp}](combined_cycle_power_plant.svg)
+![Flow sheet of the combined cycle power plant.\label{fig:ccpp}](combined_cycle_power_plant.svg){#sylt width="100%"}
 
 In this study, a combined-cycle power plant (CCPP) is analyzed to demonstrate the capabilities of the ExerPy framework for detailed exergy analysis. The analyzed CCPP, as illustrated in \autoref{fig:ccpp}, integrates a gas turbine system (GT) with a steam cycle to optimize energy conversion efficiency. The plant is designed to deliver 300 MW net electrical power, with 248 MW generated in the gas turbine, and 100 MW of thermal energy. The gas turbine system operates with a turbine inlet pressure of 15 bar and an inlet temperature of 1150 °C. The heat recovery steam generator (HRSG) generates steam at 50 bar and 505.6 °C, maintaining a minimum temperature difference of 25 K in the superheater.
 The steam cycle is split into high- and low-pressure stages. The high-pressure steam turbine expands the steam down to 15 bar. A portion of the expanded steam is extracted and condensed to provide heat, another portion is sent to the deaerator, and the rest passes through the low-pressure steam turbine. In the low-pressure steam turbine, the steam is further expanded and then condensed in the condenser (COND) using cooling water at ambient conditions. The electrical efficiency of the system is 48.5%. When coupled with the heat extraction process, the overall energetic efficiency of the system is 64.7%.
@@ -76,28 +76,27 @@ The combustion chamber (CC) is the component with the most significant exergy de
 : Exergy analysis results for each component of the combined-cycle power plant \label{tab:exergy-analysis}
 
 | Component | $\dot{E}_\mathrm{F}$ | $\dot{E}_\mathrm{P}$ | $\dot{E}_\mathrm{D}$ | $\varepsilon$ | $y$ | $y^*$ |
-|-----------|---------------------|----------------------|----------------------|---------------|------|-------|
-|           | [MW]                | [MW]                 | [MW]                 | [%]           | [%]  | [%]   |
-| CC        | 632.23              | 436.46               | 195.77               | 69.04         | 30.52| 76.98 |
-| COMP      | 241.98              | 231.04               | 10.95                | 95.48         | 1.71 | 4.30  |
-| COND      | --                  | --                   | 3.72                 | --            | 0.36 | 0.92  |
-| DEA       | 8.20                | 6.44                 | 1.76                 | 78.51         | 0.28 | 0.69  |
-| ECO       | 13.42               | 11.95                | 1.48                 | 89.01         | 0.23 | 0.58  |
-| EVA       | 74.13               | 62.48                | 11.65                | 84.29         | 1.82 | 4.58  |
-| GEN1      | 251.83              | 248.05               | 3.78                 | 98.50         | 0.59 | 1.49  |
-| GEN2      | 53.25               | 52.45                | 0.80                 | 98.50         | 0.13 | 0.31  |
-| GT        | 509.78              | 493.81               | 15.97                | 96.87         | 2.49 | 6.28  |
-| HC        | 39.72               | 39.72                | 0.00                 | 100.00        | 0.00 | 0.00  |
-| MIX       | 3.09                | 1.67                 | 1.42                 | 53.99         | 0.22 | 0.56  |
-| MOT1      | 0.04                | 0.04                 | 0.00                 | 98.50         | 0.00 | 0.00  |
-| MOT2      | 0.46                | 0.46                 | 0.01                 | 98.50         | 0.00 | 0.00  |
-| PUMP1     | 0.04                | 0.03                 | 0.01                 | 81.17         | 0.00 | 0.00  |
-| PUMP2     | 0.46                | 0.40                 | 0.06                 | 87.30         | 0.01 | 0.02  |
-| SH        | 33.35               | 29.01                | 4.35                 | 86.97         | 0.68 | 1.71  |
-| ST1       | 28.46               | 27.47                | 1.00                 | 96.50         | 0.16 | 0.39  |
-| ST2       | 28.78               | 25.78                | 3.00                 | 89.58         | 0.47 | 1.18  |
-|-----------|---------------------|----------------------|----------------------|---------------|------|-------|
-| TOT       | 641.45              | 339.72               | 254.32               | 52.96         | 39.65| 100.00|
+|           | [MW] | [MW] | [MW] | [%] | [%] | [%] |
+|-----------|-------|-------|-------|----------|------|------|
+| CC        | 632.23 | 436.46 | 195.77 | 69.04 | 30.52 | 76.98 |
+| COMP      | 241.98 | 231.04 | 10.95 | 95.48 | 1.71 | 4.30 |
+| COND      | -- | -- | 3.72 | -- | 0.36 | 0.92 |
+| DEA       | 8.20 | 6.44 | 1.76 | 78.51 | 0.28 | 0.69 |
+| ECO       | 13.42 | 11.95 | 1.48 | 89.01 | 0.23 | 0.58 |
+| EVA       | 74.13 | 62.48 | 11.65 | 84.29 | 1.82 | 4.58 |
+| GEN1      | 251.83 | 248.05 | 3.78 | 98.50 | 0.59 | 1.49 |
+| GEN2      | 53.25 | 52.45 | 0.80 | 98.50 | 0.13 | 0.31 |
+| GT        | 509.78 | 493.81 | 15.97 | 96.87 | 2.49 | 6.28 |
+| HC        | 39.72 | 39.72 | 0.00 | 100.00 | 0.00 | 0.00 |
+| MIX       | 3.09 | 1.67 | 1.42 | 53.99 | 0.22 | 0.56 |
+| MOT1      | 0.04 | 0.04 | 0.00 | 98.50 | 0.00 | 0.00 |
+| MOT2      | 0.46 | 0.46 | 0.01 | 98.50 | 0.00 | 0.00 |
+| PUMP1     | 0.04 | 0.03 | 0.01 | 81.17 | 0.00 | 0.00 |
+| PUMP2     | 0.46 | 0.40 | 0.06 | 87.30 | 0.01 | 0.02 |
+| SH        | 33.35 | 29.01 | 4.35 | 86.97 | 0.68 | 1.71 |
+| ST1       | 28.46 | 27.47 | 1.00 | 96.50 | 0.16 | 0.39 |
+| ST2       | 28.78 | 25.78 | 3.00 | 89.58 | 0.47 | 1.18 |
+| TOT       | 641.45 | 339.72 | 254.32 | 52.96 | 39.65 | 100.00 |
 
 
 The following specifications are used in the exergy analysis of the overall plant:
