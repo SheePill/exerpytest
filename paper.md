@@ -27,9 +27,6 @@ affiliations:
 date: 22 July 2025
 bibliography: paper.bib
 
-
-header-includes:
-  - \usepackage{siunitx}
 ---
 
 # Summary
@@ -70,8 +67,8 @@ The framework performs exergy analysis at both the component and system levels. 
 
 ![Flow sheet of the combined cycle power plant.\label{fig:ccpp}](combined_cycle_power_plant.svg)
 
-In this study, a combined-cycle power plant (CCPP) is analyzed to demonstrate the capabilities of the ExerPy framework for detailed exergy analysis. The analyzed CCPP, as illustrated in \autoref{fig:ccpp}, integrates a gas turbine system (GT) with a steam cycle to optimize energy conversion efficiency. The plant is designed to deliver \SI{300}{MW} net electrical power, with \SI{248}{MW} generated in the gas turbine, and \SI{100}{MW} of thermal energy. The gas turbine system operates with a turbine inlet pressure of \SI{15}{bar} and an inlet temperature of \SI{1150}{\celsius}. The heat recovery steam generator (HRSG) generates steam at \SI{50}{bar} and \SI{505.6}{\celsius}, maintaining a minimum temperature difference of \SI{25}{K} in the superheater.
-The steam cycle is split into high- and low-pressure stages. The high-pressure steam turbine expands the steam down to \SI{15}{bar}. A portion of the expanded steam is extracted and condensed to provide heat, another portion is sent to the deaerator, and the rest passes through the low-pressure steam turbine. In the low-pressure steam turbine, the steam is further expanded and then condensed in the condenser (COND) using cooling water at ambient conditions. The electrical efficiency of the system is 48.5%. When coupled with the heat extraction process, the overall energetic efficiency of the system is 64.7%.
+In this study, a combined-cycle power plant (CCPP) is analyzed to demonstrate the capabilities of the ExerPy framework for detailed exergy analysis. The analyzed CCPP, as illustrated in \autoref{fig:ccpp}, integrates a gas turbine system (GT) with a steam cycle to optimize energy conversion efficiency. The plant is designed to deliver 300 MW net electrical power, with 248 MW generated in the gas turbine, and 100 MW of thermal energy. The gas turbine system operates with a turbine inlet pressure of 15 bar and an inlet temperature of 1150 °C. The heat recovery steam generator (HRSG) generates steam at 50 bar and 505.6 °C, maintaining a minimum temperature difference of 25 K in the superheater.
+The steam cycle is split into high- and low-pressure stages. The high-pressure steam turbine expands the steam down to 15 bar. A portion of the expanded steam is extracted and condensed to provide heat, another portion is sent to the deaerator, and the rest passes through the low-pressure steam turbine. In the low-pressure steam turbine, the steam is further expanded and then condensed in the condenser (COND) using cooling water at ambient conditions. The electrical efficiency of the system is 48.5%. When coupled with the heat extraction process, the overall energetic efficiency of the system is 64.7%.
 
 The results of the exergy analysis of the CCPP simulated with Ebsilon Professional® are shown in \autoref{tab:exergy-analysis}. The exergy destruction is calculated for all components of the system based on their exergy balance equation. Since the condenser is a dissipative component, its exergy product and fuel are not defined.
 
@@ -108,7 +105,7 @@ The following specifications are used in the exergy analysis of the overall plan
 \end{align}
 where, $\dot{W}_\mathrm{el,net}$ is the net electric power and $\dot{E}_\mathrm{q}$ is the exergy related to the extracted heat flow rate. The value of $\dot{E}_\mathrm{q}$ is determined as the difference between the thermal exergy of the inlet and outlet streams. The temperature level at which the heat is transferred is not specified since the cold stream is not simulated in this example. 
 
-The system results in an exergetic efficiency of approximately 53%, which is comparable to values reported in the literature `[@petrakopoulou2012conventional; ersayin2015performance; ameri2008exergy]`. The exergy product amounts to around \SI{340}{MW}, with \SI{300}{MW} attributed to electric power and the remaining \SI{40}{MW} to thermal energy. The exergy analysis of the entire system shows that the exergy of the product is considerably lower than the energy of the product due to the low exergy value of the heat output (25.0%). This underscores the significance of incorporating exergy calculations when assessing and comparing product of different quality.
+The system results in an exergetic efficiency of approximately 53%, which is comparable to values reported in the literature `[@petrakopoulou2012conventional; ersayin2015performance; ameri2008exergy]`. The exergy product amounts to around 340 MW, with 300 MW attributed to electric power and the remaining 40 MW to thermal energy. The exergy analysis of the entire system shows that the exergy of the product is considerably lower than the energy of the product due to the low exergy value of the heat output (25.0%). This underscores the significance of incorporating exergy calculations when assessing and comparing product of different quality.
 
 The results of the exergy analysis of the CCPP simulated with Aspen Plus® and with TESPy show a maximum difference of 1% compared to the simulation results from Ebsilon Professional®, validating the accuracy and confirming the flexibility of the tool. Additional applications of ExerPy, such as the CGAM process `[@valero1994cgam]` and a heat pump, are also provided in the Git repository.
 
