@@ -44,7 +44,7 @@ To address these needs ExerPy provides a Python-based solution that automates ex
 
 ExerPy is designed to perform exergy analysis through a structured workflow that integrates seamlessly with simulation tools. The initial implementation supports Ebsilon Professional®, Aspen Plus®, and TESPy. The framework is divided into two main modules: the data processing module, which manages the extraction and preparation of simulation data, and the exergy analysis module, which conducts the detailed exergy calculations. This modular design enhances flexibility and allows users to evaluate systems of varying complexity. The architecture is outlined in the following sections and is shown in \autoref{fig:structure}.
 
-![Structure of the ExerPy framework.\label{fig:structure}](exerpy_vertical.svg){#sylt width="100%"}
+![Structure of the ExerPy framework.\label{fig:structure}](exerpy_vertical.svg){width="100%"}
 
 ### Data processing 
 
@@ -64,7 +64,7 @@ The framework performs exergy analysis at both the component and system levels. 
 # Use Case and validation
 
 
-![Flow sheet of the combined cycle power plant.\label{fig:ccpp}](combined_cycle_power_plant.svg){#sylt width="100%"}
+![Flow sheet of the combined cycle power plant.\label{fig:ccpp}](combined_cycle_power_plant.svg){width="100%"}
 
 In this study, a combined-cycle power plant (CCPP) is analyzed to demonstrate the capabilities of the ExerPy framework for detailed exergy analysis. The analyzed CCPP, as illustrated in \autoref{fig:ccpp}, integrates a gas turbine system (GT) with a steam cycle to optimize energy conversion efficiency. The plant is designed to deliver 300 MW net electrical power, with 248 MW generated in the gas turbine, and 100 MW of thermal energy. The gas turbine system operates with a turbine inlet pressure of 15 bar and an inlet temperature of 1150 °C. The heat recovery steam generator (HRSG) generates steam at 50 bar and 505.6 °C, maintaining a minimum temperature difference of 25 K in the superheater.
 The steam cycle is split into high- and low-pressure stages. The high-pressure steam turbine expands the steam down to 15 bar. A portion of the expanded steam is extracted and condensed to provide heat, another portion is sent to the deaerator, and the rest passes through the low-pressure steam turbine. In the low-pressure steam turbine, the steam is further expanded and then condensed in the condenser (COND) using cooling water at ambient conditions. The electrical efficiency of the system is 48.5%. When coupled with the heat extraction process, the overall energetic efficiency of the system is 64.7%.
