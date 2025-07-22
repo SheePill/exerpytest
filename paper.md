@@ -74,6 +74,8 @@ The results of the exergy analysis of the CCPP simulated with Ebsilon Profession
 
 The combustion chamber (CC) is the component with the most significant exergy destruction and has the greatest impact on system performance. Together with the expander and the air compressor (COMP), the GT system accounts for approximately 88% of the exergy destruction in the overall plant.
 
+: Exergy analysis results for each component of the combined-cycle power plant []{label="tab:exergy-analysis"}
+
 | Component | $\dot{E}_\mathrm{F}$ [MW] | $\dot{E}_\mathrm{P}$ [MW] | $\dot{E}_\mathrm{D}$ [MW] | $\dot{E}_\mathrm{L}$ [MW] | $\varepsilon$ [%] | $y$ [%] | $y^*$ [%] |
 |-----------|---------------------------|---------------------------|---------------------------|---------------------------|------------------|---------|-----------|
 | CC        | 632.23                    | 436.46                    | 195.77                    | --                        | 69.04            | 30.52   | 76.98     |
