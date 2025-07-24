@@ -7,6 +7,7 @@ tags:
   - applied thermodynamics
 authors:
   - name: Sergio Tomasinelli
+    corresponding: true
     orcid: 0009-0002-5084-436X
     affiliation: 1
   - name: Francesco Witte
