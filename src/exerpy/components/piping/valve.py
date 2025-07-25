@@ -257,7 +257,7 @@ class Valve(Component):
             # --- Chemical cost equation (conditionally added) ---
             A[counter, self.inl[0]["CostVar_index"]["CH"]] = (1 / self.inl[0]["E_CH"] if self.inl[0]["e_CH"] != 0 else 1)
             A[counter, self.outl[0]["CostVar_index"]["CH"]] = (-1 / self.outl[0]["E_CH"] if self.outl[0]["e_CH"] != 0 else -1)
-            equations[counter+1] = {
+            equations[counter] = {
                 "kind": "aux_equality",
                 "objects": [self.name, self.inl[0]["name"], self.outl[0]["name"]],
                 "property": "c_CH"
@@ -341,6 +341,18 @@ class Valve(Component):
             }
         counter += 1
 
+        # --- Chemical difference row (if chemical exergy is enabled) ---
+        if chemical_exergy_enabled:
+            A[counter, self.inl[0]["CostVar_index"]["CH"]] = 1 / self.inl[0]["E_CH"] if self.inl[0]["E_CH"] != 0 else 1
+            A[counter, self.outl[0]["CostVar_index"]["CH"]] = -1 / self.outl[0]["E_CH"] if self.outl[0]["E_CH"] != 0 else 1
+            b[counter] = 0
+            equations[counter] = {
+                    "kind": "dis_equality",
+                    "objects": [self.name, self.inl[0]["name"], self.outl[0]["name"]],
+                    "property": "c_CH"
+                }
+            counter += 1
+
         # --- Distribution of dissipative cost difference to other components based on E_D ---
         if all_components is None:
             all_components = []
@@ -354,7 +366,7 @@ class Valve(Component):
         total_E_D = sum(comp.E_D for comp in serving)
         diss_col = self.inl[0]["CostVar_index"].get("dissipative")
         if diss_col is None:
-            logging.warning(f"No 'dissipative' column allocated for {self.name}.")
+            logging.error(f"No 'dissipative' column allocated for {self.name}.")
         else:
             if total_E_D == 0:
                 # Fall back to equal distribution if total exergy destruction is zero.
@@ -363,7 +375,8 @@ class Valve(Component):
             else:
                 for comp in serving:
                     weight = getattr(comp, "E_D", 0) / total_E_D
-                    A[comp.exergy_cost_line, diss_col] += weight
+                    comp.serving_weight = weight
+                    A[comp.exergy_cost_line, diss_col] = weight
 
         # --- Extra overall cost balance row ---
         # This row enforces:

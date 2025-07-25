@@ -8,6 +8,7 @@ from tabulate import tabulate
 
 from .components.component import component_registry
 from .components.helpers.cycle_closer import CycleCloser
+from .components.nodes.splitter import Splitter
 from .components.helpers.power_bus import PowerBus
 from .functions import add_chemical_exergy
 from .functions import add_total_exergy_flow
@@ -1072,7 +1073,7 @@ class ExergoeconomicAnalysis:
 
         # 1. Cost balance equations for productive components.
         for comp in valid_components:
-            if not getattr(comp, "is_dissipative", False):
+            if not getattr(comp, "is_dissipative", False) and not isinstance(comp, Splitter) and not isinstance(comp, PowerBus):
             # Assign the row index for the cost balance equation to this component.
                 comp.exergy_cost_line = counter
                 for conn in self.connections.values():
@@ -1091,12 +1092,8 @@ class ExergoeconomicAnalysis:
                         "property": "Z_costs"
                     }
 
-            # For productive components: C_in - C_out = -Z_costs.
-            if getattr(comp, "is_dissipative", False):
-                continue
-            else:
                 self._b[counter] = -getattr(comp, "Z_costs", 1)
-                counter += 1
+                counter += 1      
 
         # 2. Inlet stream equations.
         # Gather all power connections.
@@ -1172,7 +1169,7 @@ class ExergoeconomicAnalysis:
                 self.equations[counter] = {
                     "kind": "aux_power_eq",
                     "objects": [ref['name'], conn['name']],
-                    "property": "c_M"
+                    "property": "c_TOT"
                 }
                 counter += 1
 
@@ -1244,7 +1241,10 @@ class ExergoeconomicAnalysis:
             raise ValueError(f"Exergoeconomic system is singular and cannot be solved. "
                              f"Provided equations: {len(self.equations)}, variables in system: {len(self.variables)}")
 
-        # Step 3: Assign solutions to connections
+        # Step 3: Distribute the cost differences of dissipative components to the serving components
+        self.distribute_all_Z_diff(C_solution)
+
+        # Step 4: Assign solutions to connections
         for conn_name, conn in self.connections.items():
             is_part_of_the_system = conn.get("source_component") or conn.get("target_component")
             if not is_part_of_the_system:
@@ -1284,12 +1284,12 @@ class ExergoeconomicAnalysis:
                     conn["C_TOT"] = C_solution[conn["CostVar_index"]["exergy"]]
                     conn["c_TOT"] = conn["C_TOT"] / conn.get("E", 1)
 
-        # Step 4: Assign C_P, C_F, C_D, and f values to components
+        # Step 5: Assign C_P, C_F, C_D, and f values to components
         for comp in self.exergy_analysis.components.values():
             if hasattr(comp, "exergoeconomic_balance") and callable(comp.exergoeconomic_balance):
                 comp.exergoeconomic_balance(self.exergy_analysis.Tamb, self.chemical_exergy_enabled)
 
-        # Step 5: Distribute the cost of loss streams to the product streams.
+        # Step 6: Distribute the cost of loss streams to the product streams.
         # For each loss stream (provided in E_L_dict), its C_TOT is distributed among the product streams (in E_P_dict)
         # in proportion to their exergy (E). After the distribution the loss stream's C_TOT is set to zero.
         loss_streams = self.E_L_dict.get("inputs", [])
@@ -1324,7 +1324,7 @@ class ExergoeconomicAnalysis:
             # The cost of the loss streams are not set to zero to show
             # them in the table, but they are attributed to the product streams.
 
-        # Step 6: Compute system-level cost variables using the E_F and E_P dictionaries.
+        # Step 7: Compute system-level cost variables using the E_F and E_P dictionaries.
         # Compute total fuel cost (C_F_total) from fuel streams.
         C_F_total = 0.0
         for conn_name in self.E_F_dict.get("inputs", []):
@@ -1367,9 +1367,84 @@ class ExergoeconomicAnalysis:
         # Check cost balance and raise error if violated
         if abs(self.system_costs["C_P"] - self.system_costs["C_F"] - self.system_costs["Z"]) > 1e-4:
             raise ValueError(
-                f"Exergoeconomic cost balance of the entire system is not satisfied: C_P ({self.system_costs['C_P']:.6f}) ≠ "
-                f"C_F ({self.system_costs['C_F']:.6f}) + Z ({self.system_costs['Z']:.6f})"
+                f"Exergoeconomic cost balance of the entire system is not satisfied: \n"
+                f"C_P = {self.system_costs['C_P']:.3f} and is not equal to \n"
+                f"C_F ({self.system_costs['C_F']:.3f}) + ∑Z ({self.system_costs['Z']:.3f}) = {self.system_costs['C_F'] + self.system_costs['Z']:.3f}. \n"
+                f"The problem may be caused by incorrect specifications of E_F, E_P, and E_L."
             )
+        
+    def distribute_all_Z_diff(self, C_solution):
+        """
+        Distribute every dissipative cost-difference (the C_diff variables) among
+        all components according to their `serving_weight`.
+
+        Parameters
+        ----------
+        C_solution : array_like
+            Solution vector of cost variables from the solved linear system.
+        """
+        # find all indices of variables named "dissipative_*"
+        diss_indices = [
+            int(idx)
+            for idx, name in self.variables.items()
+            if name.startswith("dissipative_")
+        ]
+        total_C_diff = sum(C_solution[i] for i in diss_indices)
+        # assign to each component that got a serving_weight
+        for comp in self.exergy_analysis.components.values():
+            if hasattr(comp, "serving_weight"):
+                comp.Z_diss = comp.serving_weight * total_C_diff
+
+        
+    def check_cost_balance(self, tol=1e-6):
+        """
+        Check the exergoeconomic cost balance for each component.
+
+        For each component, verify that
+        sum of inlet C_TOT minus sum of outlet C_TOT plus component Z_costs
+        equals zero within the given tolerance.
+
+        Parameters
+        ----------
+        tol : float, optional
+            Numerical tolerance for balance check (default is 1e-6).
+
+        Returns
+        -------
+        dict
+            Mapping from component name to tuple (balance, is_balanced),
+            where balance is the residual and is_balanced is True if
+            |balance| <= tol.
+        """
+        from .components.helpers.cycle_closer import CycleCloser
+
+        balances = {}
+        for name, comp in self.exergy_analysis.components.items():
+            if isinstance(comp, CycleCloser):
+                continue
+            inlet_sum = 0.0
+            outlet_sum = 0.0
+            for conn in self.connections.values():
+                if conn.get('target_component') == name:
+                    inlet_sum += conn.get('C_TOT', 0) or 0
+                if conn.get('source_component') == name:
+                    outlet_sum += conn.get('C_TOT', 0) or 0
+            comp.C_in = inlet_sum
+            comp.C_out = outlet_sum
+            z_cost = getattr(comp, 'Z_costs', 0)
+            z_diss = getattr(comp, 'Z_diss', 0)
+            balance = inlet_sum - outlet_sum + z_cost + z_diss
+            balances[name] = (balance, abs(balance) <= tol)
+
+        all_ok = all(flag for _, flag in balances.values())
+        if all_ok:
+            print("Everything is fine: all component cost balances are fulfilled.")
+        else:
+            for name, (bal, ok) in balances.items():
+                if not ok:
+                    print(f"Balance for component {name} not fulfilled: residual = {bal:.6f}")
+
+        return balances
 
 
     def run(self, Exe_Eco_Costs, Tamb):
@@ -1396,6 +1471,8 @@ class ExergoeconomicAnalysis:
         self.assign_user_costs(Exe_Eco_Costs)
         self.solve_exergoeconomic_analysis(Tamb)
         logging.info(f"Exergoeconomic analysis completed successfully.")
+        self.check_cost_balance()
+        print("stop")
 
 
     def print_equations(self):
@@ -1599,7 +1676,7 @@ class ExergoeconomicAnalysis:
         C_M_list = []
         C_CH_list = []
         C_TOT_list = []
-        # Lowercase cost columns (in GJ/{currency})
+        # Lowercase cost columns (in {currency}/GJ_ex)
         c_T_list = []
         c_M_list = []
         c_CH_list = []
@@ -1652,10 +1729,10 @@ class ExergoeconomicAnalysis:
         df_mat[f"C^M [{self.currency}/h]"] = C_M_list
         df_mat[f"C^CH [{self.currency}/h]"] = C_CH_list
         df_mat[f"C^TOT [{self.currency}/h]"] = C_TOT_list
-        df_mat[f"c^T [GJ/{self.currency}]"] = c_T_list
-        df_mat[f"c^M [GJ/{self.currency}]"] = c_M_list
-        df_mat[f"c^CH [GJ/{self.currency}]"] = c_CH_list
-        df_mat[f"c^TOT [GJ/{self.currency}]"] = c_TOT_list
+        df_mat[f"c^T [{self.currency}/GJ_ex]"] = c_T_list
+        df_mat[f"c^M [{self.currency}/GJ_ex]"] = c_M_list
+        df_mat[f"c^CH [{self.currency}/GJ_ex]"] = c_CH_list
+        df_mat[f"c^TOT [{self.currency}/GJ_ex]"] = c_TOT_list
 
         # -------------------------
         # Add cost columns to non-material connections.
@@ -1670,7 +1747,7 @@ class ExergoeconomicAnalysis:
             c_TOT = conn_data.get("c_TOT", None)
             c_TOT_non_mat.append(c_TOT * 1e9 if c_TOT is not None else None)
         df_non_mat[f"C^TOT [{self.currency}/h]"] = C_TOT_non_mat
-        df_non_mat[f"c^TOT [GJ/{self.currency}]"] = c_TOT_non_mat
+        df_non_mat[f"c^TOT [{self.currency}/GJ_ex]"] = c_TOT_non_mat
 
         # -------------------------
         # Split the material connections into two tables according to your specifications.
@@ -1702,10 +1779,10 @@ class ExergoeconomicAnalysis:
             f"C^M [{self.currency}/h]",
             f"C^CH [{self.currency}/h]",
             f"C^TOT [{self.currency}/h]",
-            f"c^T [GJ/{self.currency}]",
-            f"c^M [GJ/{self.currency}]",
-            f"c^CH [GJ/{self.currency}]",
-            f"c^TOT [GJ/{self.currency}]"
+            f"c^T [{self.currency}/GJ_ex]",
+            f"c^M [{self.currency}/GJ_ex]",
+            f"c^CH [{self.currency}/GJ_ex]",
+            f"c^TOT [{self.currency}/GJ_ex]"
         ]].copy()
 
         # Remove any columns that contain only NaN values from df_mat1, df_mat2, and df_non_mat.
@@ -1842,7 +1919,10 @@ class EconomicAnalysis:
         total_PEC = sum(PEC_list)
         # Levelize total investment cost and allocate proportionally.
         levelized_investment_cost = self.compute_levelized_investment_cost(total_PEC)
-        Z_CC = [(levelized_investment_cost * pec / total_PEC) / self.tau for pec in PEC_list]
+        if total_PEC == 0:
+            Z_CC = [0 for _ in PEC_list]
+        else:
+            Z_CC = [(levelized_investment_cost * pec / total_PEC) / self.tau for pec in PEC_list]
 
         # Compute first-year OMC for each component as a fraction of PEC.
         first_year_OMC = [frac * pec for frac, pec in zip(OMC_relative, PEC_list)]
@@ -1853,7 +1933,10 @@ class EconomicAnalysis:
         levelized_om_cost = total_first_year_OMC * celf_value
 
         # Allocate the levelized OM cost to each component in proportion to its PEC.
-        Z_OM = [(levelized_om_cost * pec / total_PEC) / self.tau for pec in PEC_list]
+        if total_PEC == 0:
+            Z_OM = [0 for _ in PEC_list]
+        else:
+            Z_OM = [(levelized_om_cost * pec / total_PEC) / self.tau for pec in PEC_list]
 
         # Total cost rate per component.
         Z_total = [zcc + zom for zcc, zom in zip(Z_CC, Z_OM)]

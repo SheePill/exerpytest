@@ -92,6 +92,20 @@ class CycleCloser(Component):
         b[counter+1] = 0
 
         counter += 2
+
+        if chemical_exergy_enabled:
+            # Chemical cost equality equation:
+            A[counter, self.inl[0]["CostVar_index"]["CH"]] = (1 / self.inl[0]["e_C"]) if self.inl[0]["e_CH"] != 0 else 1
+            A[counter, self.outl[0]["CostVar_index"]["CH"]] = (-1 / self.outl[0]["e_C"]) if self.outl[0]["e_CH"] != 0 else -1
+            equations[counter] = {
+                "kind": "aux_equality",
+                "objects": [self.name, self.inl[0]["name"], self.outl[0]["name"]],
+                "property": "c_CH"
+            }
+            b[counter] = 0
+
+            counter += 1
+
         return A, b, counter, equations
     
     def exergoeconomic_balance(self, T0, chemical_exergy_enabled=False) -> None:

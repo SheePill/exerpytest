@@ -266,11 +266,15 @@ class Mixer(Component):
         else:
             for inlet in self.inl.values():
                 A[counter + chem_row, inlet["CostVar_index"]["M"]] = 1
+
+        # Dynamically build the list of inlet names
+        inlet_names = [inlet["name"] for inlet in self.inl.values()]
+
         equations[counter + chem_row] = {
-                "kind": "aux_mixing",
-                "objects": [self.name, self.inl[0]["name"], self.inl[1]["name"], self.outl[0]["name"]],
-                "property": "c_M"
-            }
+            "kind": "aux_mixing",
+            "objects": [self.name] + inlet_names + [self.outl[0]["name"]],
+            "property": "c_M"
+        }
 
         # Set the right-hand side entries to zero for the added rows.
         if chemical_exergy_enabled:

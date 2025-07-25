@@ -71,19 +71,34 @@ class PowerBus(Component):
         equations : list or dict
             Updated structure with equation labels.
         """
-        if len(self.outl) <= 1:
-            return A, b, counter, equations
 
-        for out in self.outl[1:]:
-            A[counter, self.inl[0]["CostVar_index"]["TOT"]] = (1 / self.inl[0]["e_TOT"]) if self.inl[0]["e_TOT"] != 0 else 1
-            A[counter, out["CostVar_index"]["TOT"]]           = (-1 / out["e_TOT"])         if out["e_TOT"]         != 0 else -1
-            equations[counter] = {
-                "kind":     "aux_equality",
-                "objects":  [self.name, self.inl[0]["name"], out["name"]],
-                "property": "c_TOT"
-            }
-            b[counter] = 0
-            counter += 1
+        # Splitter case
+        if len(self.inl) >= 1 and len(self.outl) <= 1:
+            logging.info(
+                f"PowerBus {self.name} has only one output, no auxiliary equations added."
+            )
+
+        # Mixer case
+        elif len(self.inl) == 1 and len(self.outl) > 1:
+            logging.info(
+                f"PowerBus {self.name} has multiple outputs, auxiliary equations will be added."
+            )
+            for out in list(self.outl.values())[:]:
+                A[counter, self.inl[0]["CostVar_index"]["exergy"]] = (1 / self.inl[0]["E"]) if self.inl[0]["E"] != 0 else 1
+                A[counter, out["CostVar_index"]["exergy"]] = (-1 / out["E"]) if out["E"] != 0 else -1
+                equations[counter] = {
+                    "kind": "aux_power_eq",
+                    "objects":  [self.name, self.inl[0]["name"], out["name"]],
+                    "property": "c_TOT"
+                }
+                b[counter] = 0
+                counter += 1
+            
+        # Mixer case with multiple inputs and outputs
+        else: 
+            logging.error(
+                f"PowerBus {self.name} has multiple inputs and outputs, which has not been implemented yet."
+            )
 
         return A, b, counter, equations
     
@@ -91,7 +106,7 @@ class PowerBus(Component):
         """
         Exergoeconomic balance for the PowerBus is not defined.
 
-        This component does not generate or consume exergy, so all cost terms are undefined.
+        This component does not convert or destroy exergy, so all cost terms are undefined.
 
         Parameters
         ----------

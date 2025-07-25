@@ -118,7 +118,7 @@ class Splitter(Component):
             A[counter, outlet["CostVar_index"]["T"]] = (-1 / outlet["e_T"]) if outlet["e_T"] != 0 else -1
             equations[counter] = {
                 "kind": "aux_equality",
-                "objects": [self.name, self.outl[0]["name"], self.outl[1]["name"]],
+                "objects": [self.name, inlet["name"], outlet["name"]],
                 "property": "c_T"
             }
             b[counter] = 0
@@ -130,7 +130,7 @@ class Splitter(Component):
             A[counter, outlet["CostVar_index"]["M"]] = (-1 / outlet["e_M"]) if outlet["e_M"] != 0 else -1
             equations[counter] = {
                 "kind": "aux_equality",
-                "objects": [self.name, self.outl[0]["name"], self.outl[1]["name"]],
+                "objects": [self.name, inlet["name"], outlet["name"]],
                 "property": "c_M"
             }
             b[counter] = 0
@@ -143,7 +143,7 @@ class Splitter(Component):
                 A[counter, outlet["CostVar_index"]["CH"]] = (-1 / outlet["e_CH"]) if outlet["e_CH"] != 0 else -1
                 equations[counter] = {
                     "kind": "aux_equality",
-                    "objects": [self.name, self.outl[0]["name"], self.outl[1]["name"]],
+                    "objects": [self.name, inlet["name"], outlet["name"]],
                     "property": "c_CH"
                 }
                 b[counter] = 0

@@ -1339,7 +1339,7 @@ def test_flash_tank_missing_streams_raises(flash_tank):
         0: {"m": 1, "e_PH":  90, "e_T": 45},
         1: {"m": 2, "e_PH":  80, "e_T": 40}
     }
-    with pytest.raises(ValueError, match="Flash tank requires at least one inlet and two outlets."):
+    with pytest.raises(ValueError, match="Flash tank requires one inlet and two outlets."):
         flash_tank.calc_exergy_balance(T0=300, p0=101325, split_physical_exergy=True)
 
     # Only one outlet
@@ -1349,5 +1349,5 @@ def test_flash_tank_missing_streams_raises(flash_tank):
     flash_tank.outl = {
         0: {"m": 1, "e_PH":  90, "e_T": 45}
     }
-    with pytest.raises(ValueError, match="Flash tank requires at least one inlet and two outlets."):
+    with pytest.raises(ValueError, match="Flash tank requires one inlet and two outlets."):
         flash_tank.calc_exergy_balance(T0=300, p0=101325, split_physical_exergy=True)
