@@ -8,8 +8,8 @@ from tabulate import tabulate
 
 from .components.component import component_registry
 from .components.helpers.cycle_closer import CycleCloser
-from .components.nodes.splitter import Splitter
 from .components.helpers.power_bus import PowerBus
+from .components.nodes.splitter import Splitter
 from .functions import add_chemical_exergy
 from .functions import add_total_exergy_flow
 
