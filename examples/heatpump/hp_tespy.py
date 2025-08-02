@@ -39,6 +39,7 @@ nw.add_conns(a1, a2, a3)
 nw.add_conns(b1, b2, b3)
 
 c3.set_attr(fluid={"R245FA": 1})
+c0.set_attr(x=0)
 c4.set_attr(p=23)
 c2.set_attr(p=0.6)
 
@@ -53,7 +54,6 @@ pump.set_attr(eta_s=0.8)
 evaporator.set_attr(dp1=0.03, dp2=0.05)
 condenser.set_attr(dp1=0.05, dp2=0.05)
 
-condenser.set_attr(ttd_l=5)
 evaporator.set_attr(ttd_u=5)
 
 power_input = PowerSource("grid")
@@ -75,6 +75,11 @@ nw.add_conns(e1, e2, e3, e4, e5, e6, e7)
 motor1.set_attr(eta=0.985)
 motor2.set_attr(eta=0.985)
 motor3.set_attr(eta=0.985)
+
+nw.solve("design")
+
+condenser.set_attr(ttd_l=5)
+c0.set_attr(x=None)
 
 nw.solve("design")
 
