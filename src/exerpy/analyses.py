@@ -274,7 +274,7 @@ class ExergyAnalysis:
         Parameters
         ----------
         path : str
-            Path to the Ebsilon file (.bkp format).
+            Path to the Aspen file (.bkp format).
         Tamb : float, optional
             Ambient temperature for analysis, default is None.
         pamb : float, optional
@@ -287,7 +287,7 @@ class ExergyAnalysis:
         Returns
         -------
         ExergyAnalysis
-            An instance of the ExergyAnalysis class with parsed Ebsilon data.
+            An instance of the ExergyAnalysis class with parsed Aspen data.
         """
 
         from .parser.from_aspen import aspen_parser as aspen_parser
@@ -296,15 +296,15 @@ class ExergyAnalysis:
         _, file_extension = os.path.splitext(path)
 
         if file_extension == '.bkp':
-            logging.info("Running Ebsilon simulation and generating JSON data.")
+            logging.info("Running Aspen parsing and generating JSON data.")
             data = aspen_parser.run_aspen(path, split_physical_exergy=split_physical_exergy)
-            logging.info("Simulation completed successfully.")
+            logging.info("Parsing completed successfully.")
 
         else:
             # If the file format is not supported
             raise ValueError(
                 f"Unsupported file format: {file_extension}. Please provide "
-                "an Ebsilon (.bkp) file."
+                "an Aspen (.bkp) file."
             )
 
         data, Tamb, pamb = _process_json(
