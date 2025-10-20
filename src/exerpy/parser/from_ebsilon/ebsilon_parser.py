@@ -14,6 +14,7 @@ from typing import Optional
 
 from exerpy.functions import convert_to_SI
 from exerpy.functions import fluid_property_data
+from .ebsilon_functions import calc_eph_from_min
 
 from . import __ebsilon_available__
 from . import is_ebsilon_available
@@ -249,7 +250,46 @@ class EbsilonModelParser:
 
             # MATERIAL CONNECTIONS
             if (pipe_cast.Kind - 1000) not in non_material_fluids:
-                # Retrieve all data and convert them in SI units
+                # Extract basic thermodynamic properties
+                T_value = (
+                    convert_to_SI(
+                        'T',
+                        pipe_cast.T.Value,
+                        unit_id_to_string.get(pipe_cast.T.Dimension, "Unknown")
+                    ) if hasattr(pipe_cast, 'T') and pipe_cast.T.Value is not None else None
+                )
+                
+                p_value = (
+                    convert_to_SI(
+                        'p',
+                        pipe_cast.P.Value,
+                        unit_id_to_string.get(pipe_cast.P.Dimension, "Unknown")
+                    ) if hasattr(pipe_cast, 'P') and pipe_cast.P.Value is not None else None
+                )
+                
+                e_PH_value = (
+                    convert_to_SI(
+                        'e',
+                        pipe_cast.E.Value,
+                        unit_id_to_string.get(pipe_cast.E.Dimension, "Unknown")
+                    ) if hasattr(pipe_cast, 'E') and pipe_cast.E.Value is not None else None
+                )
+                
+                # If e_PH is not available from Ebsilon, calculate using min-based formula
+                if e_PH_value is None and T_value is not None and p_value is not None:
+                    if hasattr(pipe_cast, 'H') and pipe_cast.H.Value is not None and \
+                       hasattr(pipe_cast, 'S') and pipe_cast.S.Value is not None:
+                        try:
+                            e_PH_value = calc_eph_from_min(self.app, pipe_cast, p_value, T_value)
+                            if e_PH_value is not None:
+                                logging.info(
+                                    f"Physical exergy calculated using min-based formula for {pipe_cast.Name}: "
+                                    f"{e_PH_value:.2f} J/kg"
+                                )
+                        except ValueError as ve:
+                            logging.error(f"Failed to calculate e_PH from min for {pipe_cast.Name}: {ve}")
+                            e_PH_value = None
+                
                 connection_data.update({
                     'kind': 'material',
                     'm': (
@@ -261,22 +301,10 @@ class EbsilonModelParser:
                     ),
                     'm_unit': fluid_property_data['m']['SI_unit'],
 
-                    'T': (
-                        convert_to_SI(
-                            'T',
-                            pipe_cast.T.Value,
-                            unit_id_to_string.get(pipe_cast.T.Dimension, "Unknown")
-                        ) if hasattr(pipe_cast, 'T') and pipe_cast.T.Value is not None else None
-                    ),
+                    'T': T_value,
                     'T_unit': fluid_property_data['T']['SI_unit'],
 
-                    'p': (
-                        convert_to_SI(
-                            'p',
-                            pipe_cast.P.Value,
-                            unit_id_to_string.get(pipe_cast.P.Dimension, "Unknown")
-                        ) if hasattr(pipe_cast, 'P') and pipe_cast.P.Value is not None else None
-                    ),
+                    'p': p_value,
                     'p_unit': fluid_property_data['p']['SI_unit'],
 
                     'h': (
@@ -297,13 +325,7 @@ class EbsilonModelParser:
                     ),
                     's_unit': fluid_property_data['s']['SI_unit'],
 
-                    'e_PH': (
-                        convert_to_SI(
-                            'e',
-                            pipe_cast.E.Value,
-                            unit_id_to_string.get(pipe_cast.E.Dimension, "Unknown")
-                        ) if hasattr(pipe_cast, 'E') and pipe_cast.E.Value is not None else None
-                    ),
+                    'e_PH': e_PH_value,
                     'e_PH_unit': fluid_property_data['e']['SI_unit'],
 
                     'x': (
