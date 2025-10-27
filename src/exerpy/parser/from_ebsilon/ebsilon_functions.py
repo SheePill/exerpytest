@@ -196,178 +196,65 @@ def calc_eM(app: Any, pipe: Any, pressure: float, Tamb: float, pamb: float) -> f
     return eM
 
 
-def calc_eph_from_min(app: Any, pipe: Any, pressure: float, temperature: float) -> Optional[float]:
+def calc_eph_from_min(pipe: Any, Tamb: float) -> Optional[float]:
     """
     Calculate physical exergy using the minimum-valid-temperature reference state.
 
     Formula:
-        E_PH = H - H_min - T_min * (S - S_min)
+        e_PH = h - h_min - Tamb * (s - s_min)
 
     Parameters
     ----------
-    app : Ebsilon application instance
-    pipe : Stream object (pipe_cast)
-    pressure : float
-        Stream pressure in SI [Pa]
-    temperature : float
-        Stream temperature in SI [K]
+    pipe : Any
+        The Ebsilon pipe object containing thermodynamic properties.
+    Tamb : float
+        Ambient (reference) temperature in K.
 
     Returns
     -------
-    float or None
-        Physical exergy [J/kg], or None if it cannot be computed.
+    Optional[float]
+        Physical exergy in J/kg, or None if calculation fails.
 
     Notes
     -----
-    - Supports both regular FluidData and UniversalFluidData (for UniversalSubstances like molten salts)
-    - Automatically detects fluid type via pipe.HasUniversalFluidData property
-    - If PropertyTMIN_OF_P returns -999.0, fallback search finds minimum valid temperature
+    - This function accesses H_Min and S_Min from the ThermoliquidExtension.
+    - The minimum state (h_min, s_min) represents the enthalpy and entropy at the 
+      lowest valid temperature for the fluid.
+    - The ambient temperature Tamb is used as the reference temperature for the 
+      exergy calculation, while h_min and s_min provide the reference state properties.
+    - This approach is for now only suitable for ThermoLiquid fluids where conventional 
+      dead state properties may not be available or valid.
     """
     import logging
-
-    # 1) Determine if pipe uses UniversalFluidData or regular FluidData
+    
     try:
-        if hasattr(pipe, 'HasUniversalFluidData') and pipe.HasUniversalFluidData:
-            # Use the UniversalFluidData already configured in the pipe
-            fd = pipe.UniversalFluidData()
-            logging.info(f"Using UniversalFluidData for {getattr(pipe, 'Name', '<unknown>')}")
-            
-        else:
-            # Build regular FluidData as before
-            fluid_type = (pipe.Kind - 1000)
-            fd = app.NewFluidData()
-            fd.FluidType = fluid_type
-            fdAnalysis = app.NewFluidAnalysis()
-
-            # Steam/Water handling
-            if fluid_type == 3 or fluid_type == 4:  # steam or water
-                try:
-                    t_sat = CP('T', 'P', pressure, 'Q', 0, 'water')
-                except Exception:
-                    t_sat = None
-
-                if t_sat is not None and temperature > t_sat:
-                    fd.FluidType = 3  # steam
-                    fd.SteamTable = EpSteamTable.epSteamTableFromSuperiorModel
-                else:
-                    fd.FluidType = 4  # water
-
-            elif fluid_type in (15, 16, 17, 20):  # 2PhaseLiquid, 2PhaseGaseous, Salt water, ThermoLiquid
-                if hasattr(pipe, 'FMED'):
-                    fd.Medium = pipe.FMED.Value
-
-            else:
-                # flue gas, air etc.
-                fd.GasTable = EpGasTable.epGasTableFromSuperiorModel
-                # Set composition from mapping
-                for substance_key, ep_substance_id in substance_mapping.items():
-                    if hasattr(pipe, substance_key):
-                        fraction = getattr(pipe, substance_key).Value
-                        if fraction and fraction > 0:
-                            fdAnalysis.SetSubstance(ep_substance_id, fraction)
-
-            fd.SetAnalysis(fdAnalysis)
-            
-    except Exception as e:
-        logging.error(f"Failed to prepare FluidData for {getattr(pipe, 'Name', '<unknown>')}: {e}")
-        return None
-
-    # 2) Read current state from the pipe (convert to SI)
-    try:
+        # 1) Get current state from the pipe
         h_i = convert_to_SI('h', pipe.H.Value, unit_id_to_string.get(pipe.H.Dimension, "Unknown"))  # J/kg
         s_i = convert_to_SI('s', pipe.S.Value, unit_id_to_string.get(pipe.S.Dimension, "Unknown"))  # J/kgK
-    except Exception as e:
-        logging.error(f"Could not read H/S from pipe {getattr(pipe, 'Name', '<unknown>')}: {e}")
-        return None
-
-    # 3) Units for property calls
-    p_bar = pressure * 1e-5       # Pa -> bar (Ebsilon expects bar)
-    T_C   = temperature - 273.15  # K  -> °C
-
-    # 4) Try the direct property first
-    t_min_C = None
-    try:
-        tmin_candidate = fd.PropertyTMIN_OF_P(p_bar)  # returns °C or -999.0
-        if tmin_candidate != -999.0:
-            t_min_C = tmin_candidate
-    except Exception as e:
-        logging.debug(f"PropertyTMIN_OF_P raised: {e}")
-
-    # 5) Fallback: probe to find the lowest valid temperature
-    def is_valid_at(temp_C: float) -> bool:
-        """Check if H(T,p) is valid at this temperature (not -999.0)."""
-        h_kJ = fd.PropertyH_OF_PT(p_bar, temp_C)
-        return h_kJ != -999.0
-
-    if t_min_C is None:
-        # Start near the actual stream temperature if valid; otherwise try to climb up to a valid point
-        start_C = T_C if is_valid_at(T_C) else None
-        if start_C is None:
-            # Climb upward until we find a valid point (handles cases where T is below range)
-            probe = T_C
-            for _ in range(60):  # up to ~600°C span with 10°C steps
-                probe += 10.0
-                if is_valid_at(probe):
-                    start_C = probe
-                    break
-        if start_C is None:
-            logging.error(f"Could not find any valid temperature at p={p_bar:.4f} bar for {getattr(pipe, 'Name', '<unknown>')}")
-            return None
-
-        # Step downward until we hit invalid -> bracket found
-        step = 20.0
-        T_valid = start_C
-        T_probe = start_C
-        while is_valid_at(T_probe) and T_probe > -150.0:
-            T_valid = T_probe
-            T_probe -= step
-
-        if is_valid_at(T_probe):
-            # Never became invalid within scan range
-            logging.warning(f"Did not find lower invalid bound; using lowest scanned valid {T_valid:.3f} °C as t_min for {getattr(pipe, 'Name', '<unknown>')}")
-            t_min_C = T_valid
-        else:
-            T_invalid = T_probe
-            # Binary refine between [T_invalid, T_valid] to the boundary
-            tol = 0.05  # °C tolerance
-            while (T_valid - T_invalid) > tol:
-                mid = 0.5 * (T_valid + T_invalid)
-                if is_valid_at(mid):
-                    T_valid = mid
-                else:
-                    T_invalid = mid
-            t_min_C = T_valid  # lowest valid temperature
-
-    # 6) Compute h_min and s_min at T_min (slightly inside the valid region)
-    epsilon = 1e-3
-    tries = 0
-    h_min_kJ = s_min_kJ = -999.0
-    while tries < 5 and (h_min_kJ == -999.0 or s_min_kJ == -999.0):
-        T_query = t_min_C + tries * max(epsilon, 0.05)
-        h_min_kJ = fd.PropertyH_OF_PT(p_bar, T_query)
-        s_min_kJ = fd.PropertyS_OF_PT(p_bar, T_query)
-        tries += 1
-
-    if h_min_kJ == -999.0 or s_min_kJ == -999.0:
-        logging.error(
-            f"Failed to evaluate h_min/s_min around T_min≈{t_min_C:.3f} °C "
-            f"for {getattr(pipe, 'Name', '<unknown>')} at p={p_bar:.4f} bar."
+        
+        # 2) Get minimum state from ThermoliquidExtension
+        fluid_data = pipe.FluidData()
+        tl_ext = fluid_data.ThermoliquidExtension
+        
+        # Get minimum values (assuming these are in Ebsilon's standard units)
+        h_min = convert_to_SI('h', tl_ext.H_Min, unit_id_to_string.get(pipe.H.Dimension, "Unknown"))  # J/kg
+        s_min = convert_to_SI('s', tl_ext.S_Min, unit_id_to_string.get(pipe.S.Dimension, "Unknown"))  # J/kgK
+        t_min = convert_to_SI('T', tl_ext.T_Min, unit_id_to_string.get(pipe.T.Dimension, "Unknown"))  # K
+        
+        # 3) Calculate physical exergy using Tamb as reference temperature
+        e_ph = h_i - h_min - Tamb * (s_i - s_min)
+        
+        logging.info(
+            f"e_PH(min) for {getattr(pipe, 'Name', '<unknown>')}: "
+            f"T_min={t_min-273.15:.2f} °C, h_min={h_min:.1f} J/kg, s_min={s_min:.3f} J/kgK, "
+            f"Tamb={Tamb-273.15:.2f} °C, e_PH={e_ph:.1f} J/kg"
         )
+        
+        return e_ph
+        
+    except Exception as e:
+        logging.error(f"Failed to calculate e_PH from min for {getattr(pipe, 'Name', '<unknown>')}: {e}")
         return None
-
-    # 7) Assemble the exergy
-    h_min = h_min_kJ * 1e3  # kJ/kg -> J/kg
-    s_min = s_min_kJ * 1e3  # kJ/kgK -> J/kgK
-    t_min_K = (t_min_C + 273.15)
-
-    e_ph = h_i - h_min - t_min_K * (s_i - s_min)
-
-    logging.info(
-        f"e_PH(min) for {getattr(pipe, 'Name', '<unknown>')}: "
-        f"T_min={t_min_C:.2f} °C, h_min={h_min:.1f} J/kg, s_min={s_min:.3f} J/kgK, e_PH={e_ph:.1f} J/kg"
-    )
-    return e_ph
-
 
 
 @require_ebsilon

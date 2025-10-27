@@ -280,7 +280,7 @@ class EbsilonModelParser:
                     if hasattr(pipe_cast, 'H') and pipe_cast.H.Value is not None and \
                        hasattr(pipe_cast, 'S') and pipe_cast.S.Value is not None:
                         try:
-                            e_PH_value = calc_eph_from_min(self.app, pipe_cast, p_value, T_value)
+                            e_PH_value = calc_eph_from_min(pipe_cast, self.Tamb)
                             if e_PH_value is not None:
                                 logging.info(
                                     f"Physical exergy calculated using min-based formula for {pipe_cast.Name}: "
