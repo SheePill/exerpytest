@@ -27,7 +27,7 @@ class PowerBus(Component):
 
         # Log the results
         logging.info(
-            f"The exergy balance of a CycleCloser component is skipped."
+            f"The exergy balance of a PowerBus {self.name} is skipped."
         )
 
     

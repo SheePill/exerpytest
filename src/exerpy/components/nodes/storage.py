@@ -116,7 +116,7 @@ class Storage(Component):
 
         # Log the results.
         logging.info(
-            f"Storage exergy balance calculated: "
+            f"Exergy balance of Storage {self.name} calculated: "
             f"E_F = {self.E_F:.2f} W, E_P = {self.E_P:.2f} W, E_D = {self.E_D:.2f} W, "
         )
 

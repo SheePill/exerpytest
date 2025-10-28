@@ -388,7 +388,7 @@ class SimpleHeatExchanger(Component):
 
         # Log the results
         logging.info(
-            f"SimpleHeatExchanger exergy balance calculated: "
+            f"Exergy balance of SimpleHeatExchanger {self.name} calculated: "
             f"E_P={self.E_P:.2f}, E_F={self.E_F:.2f}, E_D={self.E_D:.2f}, "
             f"Efficiency={self.epsilon:.2%}"
         )

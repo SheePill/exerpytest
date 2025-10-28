@@ -107,8 +107,12 @@ class Condenser(Component):
         self.E_P = None
         self.epsilon = None
 
-        # Log the exergy balance results
-        logging.info(f"Condenser exergy balance calculated: E_D={self.E_D}, E_L={self.E_L}")
+        # Log the results
+        logging.info(
+            f"Exergy balance of Condenser {self.name} calculated: "
+            f"E_P={self.E_P:.2f}, E_F={self.E_F:.2f}, E_D={self.E_D:.2f}, "
+            f"Efficiency={self.epsilon:.2%}"
+        )
 
 
     def aux_eqs(self, A, b, counter, T0, equations, chemical_exergy_enabled):

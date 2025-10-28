@@ -171,7 +171,7 @@ class SteamGenerator(Component):
 
         # Log the results
         logging.info(
-            f"SteamGenerator exergy balance calculated: "
+            f"Exergy balance of SteamGenerator {self.name} calculated: "
             f"E_P = {self.E_P:.2f} W, E_F = {self.E_F:.2f} W, "
             f"E_D = {self.E_D:.2f} W, Efficiency = {self.epsilon:.2%}"
         )
