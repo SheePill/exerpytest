@@ -1,5 +1,7 @@
 import logging
 
+import numpy as np
+
 from exerpy.components.component import Component
 from exerpy.components.component import component_registry
 
@@ -103,9 +105,9 @@ class Condenser(Component):
         self.E_D = self.outl[0]['m'] * (self.inl[0]['e_PH'] - self.outl[0]['e_PH']) - self.E_L
 
         # Exergy fuel and product are not typically defined for a condenser
-        self.E_F = None
-        self.E_P = None
-        self.epsilon = None
+        self.E_F = np.nan
+        self.E_P = np.nan
+        self.epsilon = np.nan
 
         # Log the results
         logging.info(

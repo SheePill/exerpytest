@@ -213,12 +213,12 @@ class ExergyAnalysis:
                 # Safely calculate y and y* avoiding division by zero
                 if self.E_F != 0:
                     component.y = component.E_D / self.E_F
-                    component.y_star = component.E_D / self.E_D if component.E_D is not None else None
+                    component.y_star = component.E_D / self.E_D if component.E_D is not None else np.nan
                 else:
-                    component.y = None
-                    component.y_star = None
+                    component.y = np.nan
+                    component.y_star = np.nan
                 # Sum component destruction if available
-                if component.E_D is not None:
+                if component.E_D is not np.nan:
                     total_component_E_D += component.E_D
 
         # Check if the sum of all component exergy destructions matches the overall system exergy destruction
@@ -436,7 +436,7 @@ class ExergyAnalysis:
         # excluding CycleCloser components.
         for component_name, component in self.components.items():
             # Exclude components whose class name is "CycleCloser"
-            if component.__class__.__name__ == "CycleCloser":
+            if component.__class__.__name__ == "CycleCloser" or component.__class__.__name__ == "PowerBus":
                 continue
 
             component_results["Component"].append(component_name)

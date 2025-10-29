@@ -155,7 +155,7 @@ class Valve(Component):
             self.E_F = self.inl[0]['m'] * (self.inl[0]['e_PH'] - self.outl[0]['e_PH'])
 
         # Case 2: Inlet above ambient, outlet below or equal to ambient
-        elif T_out <= T0 and T_in > T0:
+        elif T_in > T0 and T_out <= T0:
             if split_physical_exergy:
                 self.E_P = self.inl[0]['m'] * self.outl[0]['e_T']
                 self.E_F = self.inl[0]['m'] * (self.inl[0]['e_T'] + self.inl[0]['e_M'] - 
@@ -163,7 +163,7 @@ class Valve(Component):
             else:
                 logging.warning(
                     "Exergy balance of a valve, where outlet temperature is smaller than "
-                    "ambient temperature, is not implemented for non-split physical exergy."
+                    "ambient temperature, is not implemented for non-split physical exergy. "
                     "Valve is treated as dissipative."
                 )
                 self.E_P = np.nan
