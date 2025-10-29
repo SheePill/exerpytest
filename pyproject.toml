@@ -142,3 +142,14 @@ parallel = true
 show_missing = true
 precision = 2
 omit = ["migrations"]
+
+[tool.check-manifest]
+ignore = [
+    ".pre-commit-config.yaml",
+    ".github/**",
+    "*.yaml",
+    "*.yml",
+    ".gitignore",
+    ".readthedocs.yml",
+    "tox.ini",
+]
