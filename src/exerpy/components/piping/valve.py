@@ -2,8 +2,7 @@ import logging
 
 import numpy as np
 
-from exerpy.components.component import Component
-from exerpy.components.component import component_registry
+from exerpy.components.component import Component, component_registry
 
 
 @component_registry
@@ -69,14 +68,14 @@ class Valve(Component):
         \begin{cases}
         \dot{m} \cdot (e_\mathrm{in}^\mathrm{PH} - e_\mathrm{out}^\mathrm{PH})
         & T_\mathrm{in}, T_\mathrm{out} > T_0\\
-        \dot{m} \cdot (e_\mathrm{in}^\mathrm{T} + e_\mathrm{in}^\mathrm{M} 
+        \dot{m} \cdot (e_\mathrm{in}^\mathrm{T} + e_\mathrm{in}^\mathrm{M}
         - e_\mathrm{out}^\mathrm{M})
         & T_\mathrm{in} > T_0 \geq T_\mathrm{out}\\
         \dot{m} \cdot (e_\mathrm{in}^\mathrm{M} - e_\mathrm{out}^\mathrm{M})
         & T_0 \geq T_\mathrm{in}, T_\mathrm{out}
         \end{cases}
 
-    For all cases, except when :math:`T_\mathrm{out} > T_\mathrm{in}`, the exergy 
+    For all cases, except when :math:`T_\mathrm{out} > T_\mathrm{in}`, the exergy
     destruction is calculated as:
 
     .. math::
@@ -115,28 +114,28 @@ class Valve(Component):
         ------
         ValueError
             If the required inlet and outlet streams are not properly defined.
-        """      
+        """
         # Ensure that the component has both inlet and outlet streams
         if len(self.inl) < 1 or len(self.outl) < 1:
             raise ValueError("Valve requires at least one inlet and one outlet.")
 
-        T_in = self.inl[0]['T']
-        T_out = self.outl[0]['T']
+        T_in = self.inl[0]["T"]
+        T_out = self.outl[0]["T"]
 
-        p_in = self.inl[0]['p']
-        p_out = self.outl[0]['p']
+        p_in = self.inl[0]["p"]
+        p_out = self.outl[0]["p"]
 
         # Check for zero mass flow
-        if abs(self.inl[0]['m']) < 1e-10:
+        if abs(self.inl[0]["m"]) < 1e-10:
             logging.info(f"Valve {self.name} has zero mass flow: exergy balance not considered.")
             self.E_P = np.nan
-            self.E_F = np.nan 
+            self.E_F = np.nan
             self.E_D = np.nan
             self.epsilon = np.nan
             return
-        
+
         # Check if inlet and outlet are physically identical
-        if abs(T_in - T_out) < 1e-2 and abs(p_in - p_out) <=  1e-4 * max(p_in, 1e-9):
+        if abs(T_in - T_out) < 1e-2 and abs(p_in - p_out) <= 1e-4 * max(p_in, 1e-9):
             logging.info(f"Valve {self.name} inlet and outlet are physically identical.")
             self.E_P = 0.0
             self.E_F = 0.0
@@ -152,14 +151,13 @@ class Valve(Component):
         # Case 1: Both temperatures above ambient
         if T_in > T0 and T_out > T0:
             self.E_P = np.nan
-            self.E_F = self.inl[0]['m'] * (self.inl[0]['e_PH'] - self.outl[0]['e_PH'])
+            self.E_F = self.inl[0]["m"] * (self.inl[0]["e_PH"] - self.outl[0]["e_PH"])
 
         # Case 2: Inlet above ambient, outlet below or equal to ambient
         elif T_in > T0 and T_out <= T0:
             if split_physical_exergy:
-                self.E_P = self.inl[0]['m'] * self.outl[0]['e_T']
-                self.E_F = self.inl[0]['m'] * (self.inl[0]['e_T'] + self.inl[0]['e_M'] - 
-                                        self.outl[0]['e_M'])
+                self.E_P = self.inl[0]["m"] * self.outl[0]["e_T"]
+                self.E_F = self.inl[0]["m"] * (self.inl[0]["e_T"] + self.inl[0]["e_M"] - self.outl[0]["e_M"])
             else:
                 logging.warning(
                     "Exergy balance of a valve, where outlet temperature is smaller than "
@@ -167,13 +165,13 @@ class Valve(Component):
                     "Valve is treated as dissipative."
                 )
                 self.E_P = np.nan
-                self.E_F = self.inl[0]['m'] * (self.inl[0]['e_PH'] - self.outl[0]['e_PH'])
+                self.E_F = self.inl[0]["m"] * (self.inl[0]["e_PH"] - self.outl[0]["e_PH"])
 
         # Case 3: Both temperatures below ambient
         elif T_in <= T0 and T_out <= T0:
             if split_physical_exergy:
-                self.E_P = self.inl[0]['m'] * (self.outl[0]['e_T'] - self.inl[0]['e_T'])
-                self.E_F = self.inl[0]['m'] * (self.inl[0]['e_M'] - self.outl[0]['e_M'])
+                self.E_P = self.inl[0]["m"] * (self.outl[0]["e_T"] - self.inl[0]["e_T"])
+                self.E_F = self.inl[0]["m"] * (self.inl[0]["e_M"] - self.outl[0]["e_M"])
             else:
                 logging.warning(
                     "Exergy balance of a valve, where both temperatures are smaller than "
@@ -181,7 +179,7 @@ class Valve(Component):
                     "Valve is treated as dissipative."
                 )
                 self.E_P = np.nan
-                self.E_F = self.inl[0]['m'] * (self.inl[0]['e_PH'] - self.outl[0]['e_PH'])
+                self.E_F = self.inl[0]["m"] * (self.inl[0]["e_PH"] - self.outl[0]["e_PH"])
 
         # Case 4: Inlet below or at ambient, outlet above ambient
         elif T_in <= T0 and T_out > T0:
@@ -190,7 +188,7 @@ class Valve(Component):
                 "non-physical behavior. Treated as dissipative."
             )
             self.E_P = np.nan
-            self.E_F = self.inl[0]['m'] * (self.inl[0]['e_PH'] - self.outl[0]['e_PH'])
+            self.E_F = self.inl[0]["m"] * (self.inl[0]["e_PH"] - self.outl[0]["e_PH"])
 
         else:
             logging.error(
@@ -200,10 +198,10 @@ class Valve(Component):
             )
             self.E_P = np.nan
             self.E_F = np.nan
-            self.E_D = np.nan  
-            self.epsilon = np.nan 
-            return 
-        
+            self.E_D = np.nan
+            self.epsilon = np.nan
+            return
+
         # Calculate exergy destruction
         if np.isnan(self.E_P):
             self.E_D = self.E_F
@@ -220,30 +218,29 @@ class Valve(Component):
             f"Efficiency={self.epsilon:.2%}"
         )
 
-
     def aux_eqs(self, A, b, counter, T0, equations, chemical_exergy_enabled):
         """
         Auxiliary equations for the valve.
-        
+
         This function adds rows to the cost matrix A and the right-hand-side vector b to enforce
         the following auxiliary cost relations:
-        
+
         For (T_in > T0 and T_out > T0) or (T_in <= T0 and T_out > T0):
             - Valve is treated as dissipative (warning issued)
-        
+
         For T_out <= T0:
         (1) 1/E_M_in * C_M_in - 1/E_M_out * C_M_out = 0
 
         - F-principle: specific mechanical exergy costs equalized between inlet/outlet
 
         - If E_M is zero for either stream, appropriate fallback coefficients are used
-        
+
         When chemical_exergy_enabled is True:
         (2) 1/E_CH_in * C_CH_in - 1/E_CH_out * C_CH_out = 0
 
         - F-principle: specific chemical exergy costs equalized between inlet/outlet
         - If E_CH is zero for either stream, appropriate fallback coefficients are used
-        
+
         Parameters
         ----------
         A : numpy.ndarray
@@ -258,7 +255,7 @@ class Valve(Component):
             Dictionary for storing equation labels.
         chemical_exergy_enabled : bool
             Flag indicating whether chemical exergy auxiliary equations should be added.
-        
+
         Returns
         -------
         A : numpy.ndarray
@@ -275,7 +272,7 @@ class Valve(Component):
         if np.isnan(self.E_P):
             logging.warning(f"Valve {self.name} is dissipative - no auxiliary equations added.")
             return A, b, counter, equations
-        
+
         # Productive valve - T_out must be ≤ T0 (Cases 2 or 3)
         # Mechanical cost equation (always added for productive valves)
         if self.inl[0]["e_M"] != 0 and self.outl[0]["e_M"] != 0:
@@ -291,34 +288,35 @@ class Valve(Component):
         equations[counter] = {
             "kind": "aux_equality",
             "objects": [self.name, self.inl[0]["name"], self.outl[0]["name"]],
-            "property": "c_M"
+            "property": "c_M",
         }
         b[counter] = 0
         counter += 1
-            
+
         if chemical_exergy_enabled:
             # --- Chemical cost equation (conditionally added) ---
-            A[counter, self.inl[0]["CostVar_index"]["CH"]] = (1 / self.inl[0]["E_CH"] if self.inl[0]["e_CH"] != 0 else 1)
-            A[counter, self.outl[0]["CostVar_index"]["CH"]] = (-1 / self.outl[0]["E_CH"] if self.outl[0]["e_CH"] != 0 else -1)
+            A[counter, self.inl[0]["CostVar_index"]["CH"]] = 1 / self.inl[0]["E_CH"] if self.inl[0]["e_CH"] != 0 else 1
+            A[counter, self.outl[0]["CostVar_index"]["CH"]] = (
+                -1 / self.outl[0]["E_CH"] if self.outl[0]["e_CH"] != 0 else -1
+            )
             equations[counter] = {
                 "kind": "aux_equality",
                 "objects": [self.name, self.inl[0]["name"], self.outl[0]["name"]],
-                "property": "c_CH"
+                "property": "c_CH",
             }
             # Set right-hand side for both rows.
             b[counter] = 0
             counter += 1
-        
+
         return A, b, counter, equations
-            
 
     def dis_eqs(self, A, b, counter, T0, equations, chemical_exergy_enabled=False, all_components=None):
-        """
+        r"""
         Constructs the cost equations for a dissipative Valve in ExerPy,
-        distributing the valve's extra cost difference (C_diff) to all other productive 
+        distributing the valve's extra cost difference (C_diff) to all other productive
         components (non-dissipative and non-CycleCloser) in proportion to their exergy destruction (E_D)
         and adding an extra overall cost balance row that enforces:
-        
+
         .. math::
            (\dot C_{\mathrm{in},T} - \dot C_{\mathrm{out},T})
            + (\dot C_{\mathrm{in},M} - \dot C_{\mathrm{out},M})
@@ -327,7 +325,7 @@ class Valve(Component):
 
         In this formulation, the unknown cost variable in the "dissipative" column (i.e. C_diff)
         is solved for, ensuring the valve's cost balance.
-        
+
         Parameters
         ----------
         A : numpy.ndarray
@@ -344,12 +342,12 @@ class Valve(Component):
             Flag indicating whether chemical exergy is considered. (Ignored here.)
         all_components : list, optional
             Global list of all component objects; if not provided, defaults to [].
-        
+
         Returns
         -------
         tuple
             Updated (A, b, counter, equations).
-        
+
         Notes
         -----
         - It is assumed that each inlet/outlet stream's CostVar_index dictionary has keys: "T" (thermal), "M" (mechanical), and "dissipative" (the extra unknown).
@@ -364,10 +362,10 @@ class Valve(Component):
             A[counter, self.outl[0]["CostVar_index"]["T"]] = -1
         b[counter] = 0
         equations[counter] = {
-                "kind": "dis_equality",
-                "objects": [self.name, self.inl[0]["name"], self.outl[0]["name"]],
-                "property": "c_T"
-            }
+            "kind": "dis_equality",
+            "objects": [self.name, self.inl[0]["name"], self.outl[0]["name"]],
+            "property": "c_T",
+        }
         counter += 1
 
         # --- Mechanical difference row ---
@@ -379,34 +377,39 @@ class Valve(Component):
             A[counter, self.outl[0]["CostVar_index"]["M"]] = -1
         b[counter] = 0
         equations[counter] = {
-                "kind": "dis_equality",
-                "objects": [self.name, self.inl[0]["name"], self.outl[0]["name"]],
-                "property": "c_M"
-            }
+            "kind": "dis_equality",
+            "objects": [self.name, self.inl[0]["name"], self.outl[0]["name"]],
+            "property": "c_M",
+        }
         counter += 1
 
         # --- Chemical difference row (if chemical exergy is enabled) ---
         if chemical_exergy_enabled:
             A[counter, self.inl[0]["CostVar_index"]["CH"]] = 1 / self.inl[0]["E_CH"] if self.inl[0]["E_CH"] != 0 else 1
-            A[counter, self.outl[0]["CostVar_index"]["CH"]] = -1 / self.outl[0]["E_CH"] if self.outl[0]["E_CH"] != 0 else -1
+            A[counter, self.outl[0]["CostVar_index"]["CH"]] = (
+                -1 / self.outl[0]["E_CH"] if self.outl[0]["E_CH"] != 0 else -1
+            )
             b[counter] = 0
             equations[counter] = {
-                    "kind": "dis_equality",
-                    "objects": [self.name, self.inl[0]["name"], self.outl[0]["name"]],
-                    "property": "c_CH"
-                }
+                "kind": "dis_equality",
+                "objects": [self.name, self.inl[0]["name"], self.outl[0]["name"]],
+                "property": "c_CH",
+            }
             counter += 1
 
         # --- Distribution of dissipative cost difference to other components based on E_D ---
         if all_components is None:
             all_components = []
         # Serving components: all productive components (excluding self, any dissipative, and CycleCloser)
-        serving = [comp for comp in all_components
-                if comp is not self
-                and hasattr(comp, "exergy_cost_line")
-                and not comp.__class__.__name__.endswith("PowerBus")
-                and hasattr(comp, "E_D")
-                and not np.isnan(comp.E_D)]
+        serving = [
+            comp
+            for comp in all_components
+            if comp is not self
+            and hasattr(comp, "exergy_cost_line")
+            and not comp.__class__.__name__.endswith("PowerBus")
+            and hasattr(comp, "E_D")
+            and not np.isnan(comp.E_D)
+        ]
         total_E_D = sum(comp.E_D for comp in serving)
         diss_col = self.inl[0]["CostVar_index"].get("dissipative")
         if diss_col is None:
@@ -437,34 +440,29 @@ class Valve(Component):
         # Subtract the unknown dissipative cost difference:
         A[counter, self.inl[0]["CostVar_index"]["dissipative"]] = -1
         b[counter] = -self.Z_costs
-        equations[counter] = {
-                "kind": "dis_balance",
-                "objects": [self.name],
-                "property": "dissipative_cost_balance"
-            }
+        equations[counter] = {"kind": "dis_balance", "objects": [self.name], "property": "dissipative_cost_balance"}
         counter += 1
 
         return A, b, counter, equations
 
-
     def exergoeconomic_balance(self, T0, chemical_exergy_enabled=False):
         """
         Perform exergoeconomic balance calculations for the valve.
-        
+
         This method calculates various exergoeconomic parameters including:
         - Cost rates of product (C_P) and fuel (C_F)
         - Specific cost of product (c_P) and fuel (c_F)
         - Cost rate of exergy destruction (C_D)
         - Relative cost difference (r)
         - Exergoeconomic factor (f)
-        
+
         Parameters
         ----------
         T0 : float
             Ambient temperature
         chemical_exergy_enabled : bool, optional
             If True, chemical exergy is considered in the calculations.
-            
+
         Notes
         -----
         The exergoeconomic balance considers thermal (T), chemical (CH),
@@ -473,7 +471,7 @@ class Valve(Component):
         # Check if valve is dissipative
         if np.isnan(self.E_P):
             # Dissipative valve (Cases 1, 4, or Cases 2-3 without split)
-            self.C_F = self.inl[0]['C_PH'] - self.outl[0]['C_PH']
+            self.C_F = self.inl[0]["C_PH"] - self.outl[0]["C_PH"]
             self.C_P = np.nan
         else:
             # Productive valve (Cases 2 or 3 with split_physical_exergy=True)
@@ -493,6 +491,13 @@ class Valve(Component):
         self.c_F = self.C_F / self.E_F if self.E_F != 0 else np.nan
         self.c_P = self.C_P / self.E_P if not np.isnan(self.E_P) and self.E_P != 0 else np.nan
         self.C_D = self.c_F * self.E_D if not np.isnan(self.c_F) else np.nan
-        self.r = (self.c_P - self.c_F) / self.c_F if not np.isnan(self.c_P) and not np.isnan(self.c_F) and self.c_F != 0 else np.nan
-        self.f = self.Z_costs / (self.Z_costs + self.C_D) if not np.isnan(self.C_D) and (self.Z_costs + self.C_D) != 0 else np.nan
-
+        self.r = (
+            (self.c_P - self.c_F) / self.c_F
+            if not np.isnan(self.c_P) and not np.isnan(self.c_F) and self.c_F != 0
+            else np.nan
+        )
+        self.f = (
+            self.Z_costs / (self.Z_costs + self.C_D)
+            if not np.isnan(self.C_D) and (self.Z_costs + self.C_D) != 0
+            else np.nan
+        )

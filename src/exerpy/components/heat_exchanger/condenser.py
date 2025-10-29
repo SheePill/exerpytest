@@ -2,8 +2,7 @@ import logging
 
 import numpy as np
 
-from exerpy.components.component import Component
-from exerpy.components.component import component_registry
+from exerpy.components.component import Component, component_registry
 
 
 @component_registry
@@ -12,8 +11,8 @@ class Condenser(Component):
     Class for exergy and exergoeconomic analysis of condensers (only dissipative).
 
     This class performs exergy and exergoeconomic analysis calculations for condenser components,
-    accounting for two inlet and two outlet streams. This class should be used only for dissipative 
-    condensers. For non-dissipative condensers, use components that are modeled in ExerPy using the 
+    accounting for two inlet and two outlet streams. This class should be used only for dissipative
+    condensers. For non-dissipative condensers, use components that are modeled in ExerPy using the
     `HeatExchanger` class.
 
     Attributes
@@ -54,7 +53,7 @@ class Condenser(Component):
             - Z_costs (float): investment cost rate in currency/h, default 0.0
         """
         super().__init__(**kwargs)
-    
+
     def calc_exergy_balance(self, T0: float, p0: float, split_physical_exergy) -> None:
         r"""
         Compute the exergy balance of the condenser.
@@ -76,8 +75,8 @@ class Condenser(Component):
             - \dot{E}^{\mathrm{PH}}_{\mathrm{out},1}
             - \dot{E}_{\mathrm{L}}
 
-        However, these value can only be accessed via the attributes `E_L` and `E_D` of the component. 
-        In the table of final results of the exergy analysis of the system, the exergy destruction of 
+        However, these value can only be accessed via the attributes `E_L` and `E_D` of the component.
+        In the table of final results of the exergy analysis of the system, the exergy destruction of
         the condenser is counted as the exergy loss and the exergetic destruction due to heat transfer.
 
         Parameters
@@ -97,12 +96,12 @@ class Condenser(Component):
         # Ensure that the component has both inlet and outlet streams
         if len(self.inl) < 2 or len(self.outl) < 2:
             raise ValueError("Condenser requires two inlets and two outlets.")
-        
+
         # Calculate exergy loss (E_L) for the heat transfer process
-        self.E_L = self.outl[1]['m'] * (self.outl[1]['e_PH'] - self.inl[1]['e_PH'])
+        self.E_L = self.outl[1]["m"] * (self.outl[1]["e_PH"] - self.inl[1]["e_PH"])
 
         # Calculate exergy destruction (E_D)
-        self.E_D = self.outl[0]['m'] * (self.inl[0]['e_PH'] - self.outl[0]['e_PH']) - self.E_L
+        self.E_D = self.outl[0]["m"] * (self.inl[0]["e_PH"] - self.outl[0]["e_PH"]) - self.E_L
 
         # Exergy fuel and product are not typically defined for a condenser
         self.E_F = np.nan
@@ -115,7 +114,6 @@ class Condenser(Component):
             f"E_P={self.E_P:.2f}, E_F={self.E_F:.2f}, E_D={self.E_D:.2f}, "
             f"Efficiency={self.epsilon:.2%}"
         )
-
 
     def aux_eqs(self, A, b, counter, T0, equations, chemical_exergy_enabled):
         r"""
@@ -168,7 +166,7 @@ class Condenser(Component):
             + \frac{1}{\dot{E}^{\mathrm{T}}_{\mathrm{in},1}}\,\dot{C}^{\mathrm{T}}_{\mathrm{in},1}
             = 0
 
-        Case 6: Hot stream always above and cold stream always below ambiente temperature (dissipative case): 
+        Case 6: Hot stream always above and cold stream always below ambiente temperature (dissipative case):
 
         The dissipative is not handeld here!
 
@@ -219,6 +217,7 @@ class Condenser(Component):
         ValueError
             If required cost variable indices are missing.
         """
+
         # Equality equation for mechanical and chemical exergy costs.
         def set_equal(A, row, in_item, out_item, var):
             if in_item["e_" + var] != 0 and out_item["e_" + var] != 0:
@@ -278,7 +277,7 @@ class Condenser(Component):
             self.equations[counter] = {
                 "kind": "aux_f_rule_hot",
                 "objects": [self.name, self.inl[0]["name"], self.outl[0]["name"]],
-                "property": "c_T"
+                "property": "c_T",
             }
         # Case 2: All temperatures <= T0.
         elif all([c["T"] <= T0 for c in list(self.inl.values()) + list(self.outl.values())]):
@@ -286,55 +285,51 @@ class Condenser(Component):
             self.equations[counter] = {
                 "kind": "aux_f_rule_cold",
                 "objects": [self.name, self.inl[1]["name"], self.outl[1]["name"]],
-                "property": "c_T"
+                "property": "c_T",
             }
             logging.warning(
-                f"All temperatures in {self.name} are below ambient temperature. " \
+                f"All temperatures in {self.name} are below ambient temperature. "
                 "This is not a typical case for a dissipative condenser."
             )
         # Case 3: Both stream crossing T0 (hot inlet and cold outlet > T0, hot outlet and cold inlet <= T0)
-        elif (self.inl[0]["T"] > T0 and self.outl[1]["T"] > T0 and
-            self.outl[0]["T"] <= T0 and self.inl[1]["T"] <= T0):
+        elif self.inl[0]["T"] > T0 and self.outl[1]["T"] > T0 and self.outl[0]["T"] <= T0 and self.inl[1]["T"] <= T0:
             set_thermal_p_rule(A, counter + 0)
             equations[counter] = {
                 "kind": "aux_p_rule",
                 "objects": [self.name, self.outl[0]["name"], self.outl[1]["name"]],
-                "property": "c_T"
+                "property": "c_T",
             }
             logging.warning(
-                f"Hot inlet and cold outlet in {self.name} are above ambient temperature, " \
-                "while hot outlet and cold inlet are below. This is not a typical case for a dissipative condenser." \
+                f"Hot inlet and cold outlet in {self.name} are above ambient temperature, "
+                "while hot outlet and cold inlet are below. This is not a typical case for a dissipative condenser."
                 "The exergoeconomic analysis is counting the outlets as products."
             )
         # Case 4: Only hot inlet > T0
-        elif (self.inl[0]["T"] > T0 and self.inl[1]["T"] <= T0 and
-            self.outl[0]["T"] <= T0 and self.outl[1]["T"] <= T0):
+        elif self.inl[0]["T"] > T0 and self.inl[1]["T"] <= T0 and self.outl[0]["T"] <= T0 and self.outl[1]["T"] <= T0:
             set_thermal_f_cold(A, counter + 0)
             equations[counter] = {
                 "kind": "aux_f_rule_cold",
                 "objects": [self.name, self.inl[1]["name"], self.outl[1]["name"]],
-                "property": "c_T"
+                "property": "c_T",
             }
             logging.warning(
-                f"Cold inlet in {self.name} is below ambient temperature. " \
+                f"Cold inlet in {self.name} is below ambient temperature. "
                 "This is not a typical case for a dissipative condenser."
             )
         # Case 5: Only cold inlet <= T0
-        elif (self.inl[0]["T"] > T0 and self.inl[1]["T"] <= T0 and
-            self.outl[0]["T"] > T0 and self.outl[1]["T"] > T0):
+        elif self.inl[0]["T"] > T0 and self.inl[1]["T"] <= T0 and self.outl[0]["T"] > T0 and self.outl[1]["T"] > T0:
             set_thermal_f_hot(A, counter + 0)
             equations[counter] = {
                 "kind": "aux_f_rule_hot",
                 "objects": [self.name, self.inl[0]["name"], self.outl[0]["name"]],
-                "property": "c_T"
+                "property": "c_T",
             }
             logging.warning(
-                f"Cold inlet in {self.name} is below ambient temperature. " \
+                f"Cold inlet in {self.name} is below ambient temperature. "
                 "This is not a typical case for a dissipative condenser."
             )
         # Case 6: hot stream always above T0, cold stream always below T0
-        elif (self.inl[0]["T"] > T0 and self.inl[1]["T"] <= T0 and
-            self.outl[0]["T"] > T0 and self.outl[1]["T"] <= T0):
+        elif self.inl[0]["T"] > T0 and self.inl[1]["T"] <= T0 and self.outl[0]["T"] > T0 and self.outl[1]["T"] <= T0:
             print("you shouldn't see this")
             return
         # Case 7: Default case.
@@ -343,23 +338,23 @@ class Condenser(Component):
             equations[counter] = {
                 "kind": "aux_f_rule_hot",
                 "objects": [self.name, self.inl[0]["name"], self.outl[0]["name"]],
-                "property": "c_T"
+                "property": "c_T",
             }
-        
+
         # Mechanical equations (always added)
         set_equal(A, counter + 1, self.inl[0], self.outl[0], "M")
         set_equal(A, counter + 2, self.inl[1], self.outl[1], "M")
         equations[counter + 1] = {
-                "kind": "aux_equality",
-                "objects": [self.name, self.inl[0]["name"], self.outl[0]["name"]],
-                "property": "c_M"
-            }
+            "kind": "aux_equality",
+            "objects": [self.name, self.inl[0]["name"], self.outl[0]["name"]],
+            "property": "c_M",
+        }
         equations[counter + 2] = {
-                "kind": "aux_equality",
-                "objects": [self.name, self.inl[1]["name"], self.outl[1]["name"]],
-                "property": "c_M"
-            }
-        
+            "kind": "aux_equality",
+            "objects": [self.name, self.inl[1]["name"], self.outl[1]["name"]],
+            "property": "c_M",
+        }
+
         # Only add chemical auxiliary equations if chemical exergy is enabled.
         if chemical_exergy_enabled:
             set_equal(A, counter + 3, self.inl[0], self.outl[0], "CH")
@@ -367,12 +362,12 @@ class Condenser(Component):
             equations[counter + 3] = {
                 "kind": "aux_equality",
                 "objects": [self.name, self.inl[0]["name"], self.outl[0]["name"]],
-                "property": "c_CH"
+                "property": "c_CH",
             }
             equations[counter + 4] = {
                 "kind": "aux_equality",
                 "objects": [self.name, self.inl[1]["name"], self.outl[1]["name"]],
-                "property": "c_M"
+                "property": "c_M",
             }
             num_aux_eqs = 5
         else:
@@ -383,13 +378,13 @@ class Condenser(Component):
             b[counter + i] = 0
 
         return A, b, counter + num_aux_eqs, equations
-    
+
     def exergoeconomic_balance(self, T0, chemical_exergy_enabled=False):
         r"""
         Perform exergoeconomic cost balance for the condenser.
 
         Even though this class should only consider dissipative condensers, the exergoeconomic balance is
-        still performed to ensure consistency. Please note that same of the following cases cases are not 
+        still performed to ensure consistency. Please note that same of the following cases cases are not
         typical for dissipative condensers. This may change in a future version of ExerPy.
 
         .. math::
@@ -484,7 +479,7 @@ class Condenser(Component):
                     - \dot{C}^{\mathrm{PH}}_{\mathrm{out},1}\bigr)
             - \dot{C}^{\mathrm{PH}}_{\mathrm{out},2}
             + \dot{C}^{\mathrm{PH}}_{\mathrm{in},2}
-        
+
         Parameters
         ----------
         T0 : float
@@ -494,26 +489,19 @@ class Condenser(Component):
         """
         if all([c["T"] > T0 for c in list(self.inl.values()) + list(self.outl.values())]):
             self.C_P = self.outl[1]["C_T"] - self.inl[1]["C_T"]
-            self.C_F = self.inl[0]["C_PH"] - self.outl[0]["C_PH"] + (
-                self.inl[1]["C_M"] - self.outl[1]["C_M"])
+            self.C_F = self.inl[0]["C_PH"] - self.outl[0]["C_PH"] + (self.inl[1]["C_M"] - self.outl[1]["C_M"])
         elif all([c["T"] <= T0 for c in list(self.inl.values()) + list(self.outl.values())]):
             self.C_P = self.outl[0]["C_T"] - self.inl[0]["C_T"]
-            self.C_F = self.inl[1]["C_PH"] - self.outl[1]["C_PH"] + (
-                self.inl[0]["C_M"] - self.outl[0]["C_M"])
-        elif (self.inl[0]["T"] > T0 and self.outl[1]["T"] > T0 and
-              self.outl[0]["T"] <= T0 and self.inl[1]["T"] <= T0):
+            self.C_F = self.inl[1]["C_PH"] - self.outl[1]["C_PH"] + (self.inl[0]["C_M"] - self.outl[0]["C_M"])
+        elif self.inl[0]["T"] > T0 and self.outl[1]["T"] > T0 and self.outl[0]["T"] <= T0 and self.inl[1]["T"] <= T0:
             self.C_P = self.outl[0]["C_T"] + self.outl[1]["C_T"]
-            self.C_F = self.inl[0]["C_PH"] + self.inl[1]["C_PH"] - (
-                self.outl[0]["C_M"] + self.outl[1]["C_M"])
-        elif (self.inl[0]["T"] > T0 and self.inl[1]["T"] <= T0 and
-              self.outl[0]["T"] <= T0 and self.outl[1]["T"] <= T0):
+            self.C_F = self.inl[0]["C_PH"] + self.inl[1]["C_PH"] - (self.outl[0]["C_M"] + self.outl[1]["C_M"])
+        elif self.inl[0]["T"] > T0 and self.inl[1]["T"] <= T0 and self.outl[0]["T"] <= T0 and self.outl[1]["T"] <= T0:
             self.C_P = self.outl[0]["C_T"]
-            self.C_F = self.inl[0]["C_PH"] + self.inl[1]["C_PH"] - (
-               self.outl[1]["C_PH"] + self.outl[0]["C_M"])
+            self.C_F = self.inl[0]["C_PH"] + self.inl[1]["C_PH"] - (self.outl[1]["C_PH"] + self.outl[0]["C_M"])
         else:
             self.C_P = self.outl[1]["C_T"]
-            self.C_F = self.inl[0]["C_PH"] - self.outl[0]["C_PH"] + (
-                self.inl[1]["C_PH"] - self.outl[1]["C_M"])
+            self.C_F = self.inl[0]["C_PH"] - self.outl[0]["C_PH"] + (self.inl[1]["C_PH"] - self.outl[1]["C_M"])
 
         self.c_F = self.C_F / self.E_F
         self.c_P = self.C_P / self.E_P

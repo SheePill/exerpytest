@@ -1,9 +1,6 @@
 import logging
 
-import numpy as np
-
-from exerpy.components.component import Component
-from exerpy.components.component import component_registry
+from exerpy.components.component import Component, component_registry
 
 
 @component_registry
@@ -82,7 +79,7 @@ class FlashTank(Component):
 
         Notes
         -----
-        The definition of exergy fuel and product for this component has not been validated yet. For now, the 
+        The definition of exergy fuel and product for this component has not been validated yet. For now, the
         exergy fuel is defined as the inlet streams exergy, and the exergy product is defined as the
         sum of the outlet streams' exergies (i). The exergy destruction is calculated as the difference between the exergy fuel and product.
         .. math::
@@ -97,16 +94,13 @@ class FlashTank(Component):
         # Ensure that the component has at least two outlets and one inlet.
         if len(self.inl) < 1 or len(self.outl) < 2:
             raise ValueError("Flash tank requires one inlet and two outlets.")
-        
-        if split_physical_exergy:
-            exergy_type = 'e_T'
-        else:
-            exergy_type = 'e_PH'
+
+        exergy_type = "e_T" if split_physical_exergy else "e_PH"
 
         # Calculate exergy fuel (E_F) from inlet streams.
-        self.E_F = sum(inlet['m'] * inlet[exergy_type] for inlet in self.inl.values())
+        self.E_F = sum(inlet["m"] * inlet[exergy_type] for inlet in self.inl.values())
         # Calculate exergy product (E_P) from outlet streams.
-        self.E_P = sum(outlet['m'] * outlet[exergy_type] for outlet in self.outl.values())
+        self.E_P = sum(outlet["m"] * outlet[exergy_type] for outlet in self.outl.values())
 
         # Exergy destruction and efficiency.
         self.E_D = self.E_F - self.E_P
@@ -118,7 +112,6 @@ class FlashTank(Component):
             f"E_F = {self.E_F:.2f} W, E_P = {self.E_P:.2f} W, E_D = {self.E_D:.2f} W, "
             f"Efficiency = {self.epsilon:.2%}"
         )
-
 
     def aux_eqs(self, A, b, counter, T0, equations, chemical_exergy_enabled):
         """
@@ -163,20 +156,20 @@ class FlashTank(Component):
         # --- Thermal product‐rule: c_T,out0 = c_T,out1 ---
         #  1/e_T,out0 · C_T,out0  − 1/e_T,out1 · C_T,out1 = 0
         if out0["e_T"] != 0 and out1["e_T"] != 0:
-            A[counter, out0["CostVar_index"]["T"]] =  1.0 / out0["e_T"]
+            A[counter, out0["CostVar_index"]["T"]] = 1.0 / out0["e_T"]
             A[counter, out1["CostVar_index"]["T"]] = -1.0 / out1["e_T"]
         elif out0["e_T"] == 0 and out1["e_T"] != 0:
             A[counter, out0["CostVar_index"]["T"]] = 1.0
         elif out0["e_T"] != 0 and out1["e_T"] == 0:
             A[counter, out1["CostVar_index"]["T"]] = 1.0
         else:
-            A[counter, out0["CostVar_index"]["T"]] =  1.0
+            A[counter, out0["CostVar_index"]["T"]] = 1.0
             A[counter, out1["CostVar_index"]["T"]] = -1.0
 
         equations[counter] = {
-            "kind":     "aux_p_rule",
-            "objects":  [self.name, out0["name"], out1["name"]],
-            "property": "c_T"
+            "kind": "aux_p_rule",
+            "objects": [self.name, out0["name"], out1["name"]],
+            "property": "c_T",
         }
         b[counter] = 0.0
         counter += 1
@@ -184,20 +177,20 @@ class FlashTank(Component):
         # --- Mechanical equality: c_M,inlet = c_M,outlet_i for each outlet ---
         for out in (out0, out1):
             if inlet["e_M"] != 0 and out["e_M"] != 0:
-                A[counter, inlet["CostVar_index"]["M"]] =  1.0 / inlet["e_M"]
-                A[counter, out   ["CostVar_index"]["M"]] = -1.0 / out["e_M"]
+                A[counter, inlet["CostVar_index"]["M"]] = 1.0 / inlet["e_M"]
+                A[counter, out["CostVar_index"]["M"]] = -1.0 / out["e_M"]
             elif inlet["e_M"] == 0 and out["e_M"] != 0:
                 A[counter, inlet["CostVar_index"]["M"]] = 1.0
             elif inlet["e_M"] != 0 and out["e_M"] == 0:
-                A[counter, out   ["CostVar_index"]["M"]] = 1.0
+                A[counter, out["CostVar_index"]["M"]] = 1.0
             else:
-                A[counter, inlet["CostVar_index"]["M"]] =  1.0
-                A[counter, out   ["CostVar_index"]["M"]] = -1.0
+                A[counter, inlet["CostVar_index"]["M"]] = 1.0
+                A[counter, out["CostVar_index"]["M"]] = -1.0
 
             equations[counter] = {
-                "kind":     "aux_equality",
-                "objects":  [self.name, inlet["name"], out["name"]],
-                "property": "c_M"
+                "kind": "aux_equality",
+                "objects": [self.name, inlet["name"], out["name"]],
+                "property": "c_M",
             }
             b[counter] = 0.0
             counter += 1
@@ -206,26 +199,25 @@ class FlashTank(Component):
         if chemical_exergy_enabled:
             for out in (out0, out1):
                 if inlet["e_CH"] != 0 and out["e_CH"] != 0:
-                    A[counter, inlet["CostVar_index"]["CH"]] =  1.0 / inlet["e_CH"]
-                    A[counter, out   ["CostVar_index"]["CH"]] = -1.0 / out["e_CH"]
+                    A[counter, inlet["CostVar_index"]["CH"]] = 1.0 / inlet["e_CH"]
+                    A[counter, out["CostVar_index"]["CH"]] = -1.0 / out["e_CH"]
                 elif inlet["e_CH"] == 0 and out["e_CH"] != 0:
                     A[counter, inlet["CostVar_index"]["CH"]] = 1.0
                 elif inlet["e_CH"] != 0 and out["e_CH"] == 0:
-                    A[counter, out   ["CostVar_index"]["CH"]] = 1.0
+                    A[counter, out["CostVar_index"]["CH"]] = 1.0
                 else:
-                    A[counter, inlet["CostVar_index"]["CH"]] =  1.0
-                    A[counter, out   ["CostVar_index"]["CH"]] = -1.0
+                    A[counter, inlet["CostVar_index"]["CH"]] = 1.0
+                    A[counter, out["CostVar_index"]["CH"]] = -1.0
 
                 equations[counter] = {
-                    "kind":     "aux_equality",
-                    "objects":  [self.name, inlet["name"], out["name"]],
-                    "property": "c_CH"
+                    "kind": "aux_equality",
+                    "objects": [self.name, inlet["name"], out["name"]],
+                    "property": "c_CH",
                 }
                 b[counter] = 0.0
                 counter += 1
 
         return A, b, counter, equations
-    
 
     def exergoeconomic_balance(self, T0, chemical_exergy_enabled=False):
         r"""

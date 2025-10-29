@@ -1,8 +1,19 @@
-from tespy.components import Compressor, Source, Sink, CycleCloser, HeatExchanger, Pump, Valve, PowerBus, PowerSource, Motor
-from tespy.connections import Connection, Ref, PowerConnection
+from tespy.components import (
+    Compressor,
+    CycleCloser,
+    HeatExchanger,
+    Motor,
+    PowerBus,
+    PowerSource,
+    Pump,
+    Sink,
+    Source,
+    Valve,
+)
+from tespy.connections import Connection, PowerConnection
 from tespy.networks import Network
-from exerpy import ExergyAnalysis, ExergoeconomicAnalysis
 
+from exerpy import ExergyAnalysis
 
 nw = Network(T_unit="C", p_unit="bar", h_unit="kJ / kg", m_unit="kg / s")
 
@@ -94,20 +105,11 @@ T0 = 283.15
 
 ean = ExergyAnalysis.from_tespy(nw, T0, p0, split_physical_exergy=False)
 # %%[exergy_analysis_setup]
-fuel = {
-    "inputs": ['e1'],
-    "outputs": []
-}
+fuel = {"inputs": ["e1"], "outputs": []}
 
-product = {
-    "inputs": ['23'],
-    "outputs": ['21']
-}
+product = {"inputs": ["23"], "outputs": ["21"]}
 
-loss = {
-    "inputs": ['13'],
-    "outputs": ['11']
-}
+loss = {"inputs": ["13"], "outputs": ["11"]}
 # %%[exergy_analysis_flows]
 ean.analyse(E_F=fuel, E_P=product, E_L=loss)
 df_component_results, _, _ = ean.exergy_results()

@@ -2,8 +2,7 @@ import logging
 
 import numpy as np
 
-from exerpy.components.component import Component
-from exerpy.components.component import component_registry
+from exerpy.components.component import Component, component_registry
 
 
 @component_registry
@@ -88,7 +87,7 @@ class Compressor(Component):
         r"""Initialize compressor component with given parameters."""
         super().__init__(**kwargs)
         self.P = None
-        self.Z_costs = kwargs.get('Z_costs', 0.0)  # Investment cost rate in currency/h
+        self.Z_costs = kwargs.get("Z_costs", 0.0)  # Investment cost rate in currency/h
 
     def calc_exergy_balance(self, T0: float, p0: float, split_physical_exergy) -> None:
         r"""
@@ -109,11 +108,10 @@ class Compressor(Component):
         """
         # Get power flow if not already available
         if self.P is None:
-            self.P = self.outl[0]['m'] * (self.outl[0]['h'] - self.inl[0]['h'])
-
+            self.P = self.outl[0]["m"] * (self.outl[0]["h"] - self.inl[0]["h"])
 
         # First, check for the invalid case: outlet temperature smaller than inlet temperature.
-        if self.inl[0]['T'] > self.outl[0]['T']:
+        if self.inl[0]["T"] > self.outl[0]["T"]:
             logging.warning(
                 f"Exergy balance of compressor '{self.name}' where outlet temperature ({self.outl[0]['T']}) "
                 f"is smaller than inlet temperature ({self.inl[0]['T']}) is not implemented."
@@ -122,32 +120,36 @@ class Compressor(Component):
             self.E_F = np.nan
 
         # Case 1: Both temperatures above ambient
-        elif round(self.inl[0]['T'], 5) >= T0 and round(self.outl[0]['T'], 5) > T0:
-            self.E_P = self.outl[0]['m'] * (self.outl[0]['e_PH'] - self.inl[0]['e_PH'])
+        elif round(self.inl[0]["T"], 5) >= T0 and round(self.outl[0]["T"], 5) > T0:
+            self.E_P = self.outl[0]["m"] * (self.outl[0]["e_PH"] - self.inl[0]["e_PH"])
             self.E_F = abs(self.P)
 
         # Case 2: Inlet below, outlet above ambient
-        elif round(self.inl[0]['T'], 5) < T0 and round(self.outl[0]['T'], 5) > T0:
+        elif round(self.inl[0]["T"], 5) < T0 and round(self.outl[0]["T"], 5) > T0:
             if split_physical_exergy:
-                self.E_P = (self.outl[0]['m'] * self.outl[0]['e_T'] +
-                            self.outl[0]['m'] * (self.outl[0]['e_M'] - self.inl[0]['e_M']))
-                self.E_F = abs(self.P) + self.inl[0]['m'] * self.inl[0]['e_T']
+                self.E_P = self.outl[0]["m"] * self.outl[0]["e_T"] + self.outl[0]["m"] * (
+                    self.outl[0]["e_M"] - self.inl[0]["e_M"]
+                )
+                self.E_F = abs(self.P) + self.inl[0]["m"] * self.inl[0]["e_T"]
             else:
-                logging.warning("While dealing with compressor below ambient, "
-                                "physical exergy should be split into thermal and mechanical components!")
-                self.E_P = self.outl[0]['m'] * (self.outl[0]['e_PH'] - self.inl[0]['e_PH'])
+                logging.warning(
+                    "While dealing with compressor below ambient, "
+                    "physical exergy should be split into thermal and mechanical components!"
+                )
+                self.E_P = self.outl[0]["m"] * (self.outl[0]["e_PH"] - self.inl[0]["e_PH"])
                 self.E_F = abs(self.P)
 
         # Case 3: Both temperatures below ambient
-        elif round(self.inl[0]['T'], 5) < T0 and round(self.outl[0]['T'], 5) <= T0:
+        elif round(self.inl[0]["T"], 5) < T0 and round(self.outl[0]["T"], 5) <= T0:
             if split_physical_exergy:
-                self.E_P = self.outl[0]['m'] * (self.outl[0]['e_M'] - self.inl[0]['e_M'])
-                self.E_F = abs(self.P) + self.inl[0]['m'] * (self.inl[0]['e_T'] -
-                                                            self.outl[0]['e_T'])
+                self.E_P = self.outl[0]["m"] * (self.outl[0]["e_M"] - self.inl[0]["e_M"])
+                self.E_F = abs(self.P) + self.inl[0]["m"] * (self.inl[0]["e_T"] - self.outl[0]["e_T"])
             else:
-                logging.warning("While dealing with compressor below ambient, "
-                                "physical exergy should be split into thermal and mechanical components!")
-                self.E_P = self.outl[0]['m'] * (self.outl[0]['e_PH'] - self.inl[0]['e_PH'])
+                logging.warning(
+                    "While dealing with compressor below ambient, "
+                    "physical exergy should be split into thermal and mechanical components!"
+                )
+                self.E_P = self.outl[0]["m"] * (self.outl[0]["e_PH"] - self.inl[0]["e_PH"])
                 self.E_F = abs(self.P)
 
         # Invalid case: outlet temperature smaller than inlet
@@ -170,32 +172,31 @@ class Compressor(Component):
             f"Efficiency={self.epsilon:.2%}"
         )
 
-
     def aux_eqs(self, A, b, counter, T0, equations, chemical_exergy_enabled):
         """
         Auxiliary equations for the compressor.
-        
+
         This function adds rows to the cost matrix A and the right-hand-side vector b to enforce
         the following auxiliary cost relations:
-        
+
         (1) Chemical exergy cost equation (if enabled):
             1/E_CH_in * C_CH_in - 1/E_CH_out * C_CH_out = 0
             - F-principle: specific chemical exergy costs equalized between inlet/outlet
-            
+
         (2) Thermal/Mechanical exergy cost equations (based on temperature conditions):
-            
+
             Case 1 (T_in > T0, T_out > T0):
             1/dET * C_T_out - 1/dET * C_T_in - 1/dEM * C_M_out + 1/dEM * C_M_in = 0
             - P-principle: relates inlet/outlet thermal and mechanical exergy costs
-            
+
             Case 2 (T_in ≤ T0, T_out > T0):
             1/E_T_out * C_T_out - 1/dEM * C_M_out + 1/dEM * C_M_in = 0
             - P-principle: relates outlet thermal and inlet/outlet mechanical exergy costs
-            
+
             Case 3 (T_in ≤ T0, T_out ≤ T0):
             1/E_T_out * C_T_out - 1/E_T_in * C_T_in = 0
             - F-principle: specific thermal exergy costs equalized between inlet/outlet
-        
+
         Parameters
         ----------
         A : numpy.ndarray
@@ -210,7 +211,7 @@ class Compressor(Component):
             Data structure for storing equation labels.
         chemical_exergy_enabled : bool
             Flag indicating whether chemical exergy auxiliary equations should be added.
-        
+
         Returns
         -------
         A : numpy.ndarray
@@ -225,12 +226,16 @@ class Compressor(Component):
         # --- Chemical equality equation (row added only if enabled) ---
         if chemical_exergy_enabled:
             # Set the chemical cost equality:
-            A[counter, self.inl[0]["CostVar_index"]["CH"]] = (1 / self.inl[0]["E_CH"]) if self.inl[0]["e_CH"] != 0 else 1
-            A[counter, self.outl[0]["CostVar_index"]["CH"]] = (-1 / self.outl[0]["E_CH"]) if self.outl[0]["e_CH"] != 0 else 1
+            A[counter, self.inl[0]["CostVar_index"]["CH"]] = (
+                (1 / self.inl[0]["E_CH"]) if self.inl[0]["e_CH"] != 0 else 1
+            )
+            A[counter, self.outl[0]["CostVar_index"]["CH"]] = (
+                (-1 / self.outl[0]["E_CH"]) if self.outl[0]["e_CH"] != 0 else 1
+            )
             equations[counter] = {
                 "kind": "aux_equality",
                 "objects": [self.name, self.inl[0]["name"], self.outl[0]["name"]],
-                "property": "c_CH"
+                "property": "c_CH",
             }
             chem_row = 1
         else:
@@ -240,7 +245,7 @@ class Compressor(Component):
         # Compute differences in thermal and mechanical exergy:
         dET = self.outl[0]["E_T"] - self.inl[0]["E_T"]
         dEM = self.outl[0]["E_M"] - self.inl[0]["E_M"]
-        
+
         # The row for the thermal/mechanical equation:
         row_index = counter + chem_row
         if self.inl[0]["T"] > T0 and self.outl[0]["T"] > T0:
@@ -252,7 +257,7 @@ class Compressor(Component):
                 equations[row_index] = {
                     "kind": "aux_p_rule",
                     "objects": [self.name, self.inl[0]["name"], self.outl[0]["name"]],
-                    "property": "c_T, c_M"
+                    "property": "c_T, c_M",
                 }
             else:
                 logging.warning("Case where thermal or mechanical exergy difference is zero is not implemented.")
@@ -263,7 +268,7 @@ class Compressor(Component):
             equations[row_index] = {
                 "kind": "aux_p_rule",
                 "objects": [self.name, self.inl[0]["name"], self.outl[0]["name"]],
-                "property": "c_T, c_M"
+                "property": "c_T, c_M",
             }
         else:
             A[row_index, self.inl[0]["CostVar_index"]["T"]] = -1 / self.inl[0]["E_T"]
@@ -271,31 +276,28 @@ class Compressor(Component):
             equations[row_index] = {
                 "kind": "aux_f_rule",
                 "objects": [self.name, self.inl[0]["name"], self.outl[0]["name"]],
-                "property": "c_T"
+                "property": "c_T",
             }
-        
+
         # Set the right-hand side entry for the thermal/mechanical row to zero.
         b[row_index] = 0
 
         # Update the counter accordingly.
-        if chemical_exergy_enabled:
-            new_counter = counter + 2
-        else:
-            new_counter = counter + 1
+        new_counter = counter + 2 if chemical_exergy_enabled else counter + 1
 
         return A, b, new_counter, equations
 
     def exergoeconomic_balance(self, T0, chemical_exergy_enabled=False):
         """
         Perform exergoeconomic balance calculations for the compressor.
-        
+
         This method calculates various exergoeconomic parameters including:
         - Cost rates of product (C_P) and fuel (C_F)
         - Specific cost of product (c_P) and fuel (c_F)
         - Cost rate of exergy destruction (C_D)
         - Relative cost difference (r)
         - Exergoeconomic factor (f)
-        
+
         Parameters
         ----------
         T0 : float

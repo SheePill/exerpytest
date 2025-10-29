@@ -2,8 +2,7 @@ import logging
 
 import numpy as np
 
-from exerpy.components.component import Component
-from exerpy.components.component import component_registry
+from exerpy.components.component import Component, component_registry
 
 
 @component_registry
@@ -90,52 +89,55 @@ class Turbine(Component):
         """
         # Get power flow if not already available
         if self.P is None:
-            self.P = self._total_outlet('m', 'h') - self.inl[0]['m'] * self.inl[0]['h']
+            self.P = self._total_outlet("m", "h") - self.inl[0]["m"] * self.inl[0]["h"]
 
         # Case 1: Both temperatures above ambient
-        if self.inl[0]['T'] >= T0 and self.outl[0]['T'] >= T0 and self.inl[0]['T'] >= self.outl[0]['T']:
+        if self.inl[0]["T"] >= T0 and self.outl[0]["T"] >= T0 and self.inl[0]["T"] >= self.outl[0]["T"]:
             self.E_P = abs(self.P)
-            self.E_F = (self.inl[0]['m'] * self.inl[0]['e_PH'] -
-                        self._total_outlet('m', 'e_PH'))
+            self.E_F = self.inl[0]["m"] * self.inl[0]["e_PH"] - self._total_outlet("m", "e_PH")
 
         # Case 2: Inlet above, outlet at/below ambient
-        elif self.inl[0]['T'] > T0 and self.outl[0]['T'] <= T0:
+        elif self.inl[0]["T"] > T0 and self.outl[0]["T"] <= T0:
             if split_physical_exergy:
-                self.E_P = abs(self.P) + self._total_outlet('m', 'e_T')
-                self.E_F = (self.inl[0]['m'] * self.inl[0]['e_T'] +
-                            self.inl[0]['m'] * self.inl[0]['e_M'] -
-                            self._total_outlet('m', 'e_M'))
+                self.E_P = abs(self.P) + self._total_outlet("m", "e_T")
+                self.E_F = (
+                    self.inl[0]["m"] * self.inl[0]["e_T"]
+                    + self.inl[0]["m"] * self.inl[0]["e_M"]
+                    - self._total_outlet("m", "e_M")
+                )
             else:
-                logging.warning("While dealing with expander below ambient, "
-                                "physical exergy should be split into thermal and mechanical components!")
+                logging.warning(
+                    "While dealing with expander below ambient, "
+                    "physical exergy should be split into thermal and mechanical components!"
+                )
                 self.E_P = np.nan
                 self.E_F = np.nan
 
         # Case 3: Both temperatures at/below ambient
-        elif self.inl[0]['T'] <= T0 and self.outl[0]['T'] <= T0:
+        elif self.inl[0]["T"] <= T0 and self.outl[0]["T"] <= T0:
             if split_physical_exergy:
-                self.E_P = abs(self.P) + (
-                    self._total_outlet('m', 'e_T') - self.inl[0]['m'] * self.inl[0]['e_T'])
-                self.E_F = (self.inl[0]['m'] * self.inl[0]['e_M'] -
-                            self._total_outlet('m', 'e_M'))
+                self.E_P = abs(self.P) + (self._total_outlet("m", "e_T") - self.inl[0]["m"] * self.inl[0]["e_T"])
+                self.E_F = self.inl[0]["m"] * self.inl[0]["e_M"] - self._total_outlet("m", "e_M")
             else:
-                logging.warning("While dealing with expander below ambient, "
-                                "physical exergy should be split into thermal and mechanical components!")
+                logging.warning(
+                    "While dealing with expander below ambient, "
+                    "physical exergy should be split into thermal and mechanical components!"
+                )
                 self.E_P = np.nan
                 self.E_F = np.nan
         # Invalid case: outlet temperature larger than inlet
         else:
             logging.warning(
-                'Exergy balance of a turbine where outlet temperature is larger '
-                'than inlet temperature is not implemented.'
+                "Exergy balance of a turbine where outlet temperature is larger "
+                "than inlet temperature is not implemented."
             )
             self.E_P = np.nan
             self.E_F = np.nan
 
         # Calculate exergy destruction and efficiency
         self.E_D = self.E_F - self.E_P
-        if self.E_F == np.nan:
-            self.E_D = self.inl[0]['m'] * self.inl[0]['e_PH'] - self._total_outlet('m', 'e_PH') - abs(self.P)
+        if np.nan == self.E_F:
+            self.E_D = self.inl[0]["m"] * self.inl[0]["e_PH"] - self._total_outlet("m", "e_PH") - abs(self.P)
         self.epsilon = self.calc_epsilon()
 
         # Log the results
@@ -166,31 +168,30 @@ class Turbine(Component):
             if outlet and mass_flow in outlet and property_name in outlet:
                 total += outlet[mass_flow] * outlet[property_name]
         return total
-    
 
     def aux_eqs(self, A, b, counter, T0, equations, chemical_exergy_enabled):
         """
         Auxiliary equations for the turbine.
-        
+
         This function adds rows to the cost matrix A and the right-hand-side vector b to enforce
         the following auxiliary cost relations:
-        
+
         For each material outlet (when inlet and first outlet are above ambient temperature T0):
-        
+
         (1) 1/E_T_in * C_T_in - 1/E_T_out * C_T_out = 0
             - F-principle: specific thermal exergy costs equalized between inlet and each outlet
-            
+
         (2) 1/E_M_in * C_M_in - 1/E_M_out * C_M_out = 0
             - F-principle: specific mechanical exergy costs equalized between inlet and each outlet
-            
+
         (3) 1/E_CH_in * C_CH_in - 1/E_CH_out * C_CH_out = 0 (if chemical_exergy_enabled)
             - F-principle: specific chemical exergy costs equalized between inlet and each outlet
-        
+
         For power outlets (with both source and target components):
-        
+
         (4) 1/E_ref * C_ref - 1/E_out * C_out = 0
             - P-principle: specific power exergy costs equalized across all power outlets
-        
+
         Parameters
         ----------
         A : numpy.ndarray
@@ -205,7 +206,7 @@ class Turbine(Component):
             Data structure for storing equation labels.
         chemical_exergy_enabled : bool
             Flag indicating whether chemical exergy auxiliary equations should be added.
-        
+
         Returns
         -------
         A : numpy.ndarray
@@ -231,13 +232,11 @@ class Turbine(Component):
                 A[counter + row_offset, self.inl[0]["CostVar_index"]["T"]] = (
                     1 / self.inl[0]["E_T"] if self.inl[0]["e_T"] != 0 else 1
                 )
-                A[counter + row_offset, outlet["CostVar_index"]["T"]] = (
-                    -1 / outlet["E_T"] if outlet["e_T"] != 0 else -1
-                )
+                A[counter + row_offset, outlet["CostVar_index"]["T"]] = -1 / outlet["E_T"] if outlet["e_T"] != 0 else -1
                 equations[counter + row_offset] = {
                     "kind": "aux_f_rule",
                     "objects": [self.name, self.inl[0]["name"], self.outl[0]["name"]],
-                    "property": "c_T"
+                    "property": "c_T",
                 }
 
                 # --- Mechanical exergy equation ---
@@ -250,7 +249,7 @@ class Turbine(Component):
                 equations[counter + row_offset + 1] = {
                     "kind": "aux_f_rule",
                     "objects": [self.name, self.inl[0]["name"], self.outl[0]["name"]],
-                    "property": "c_M"
+                    "property": "c_M",
                 }
 
                 # --- Chemical exergy equation (conditionally added) ---
@@ -264,9 +263,9 @@ class Turbine(Component):
                     equations[counter + row_offset + 2] = {
                         "kind": "aux_equality",
                         "objects": [self.name, self.inl[0]["name"], self.outl[0]["name"]],
-                        "property": "c_CH"
+                        "property": "c_CH",
                     }
-            
+
             # Update counter based on number of rows added for all material outlets.
             num_material_rows = num_rows_per_outlet * len(material_outlets)
             for j in range(num_material_rows):
@@ -274,10 +273,13 @@ class Turbine(Component):
             counter += num_material_rows
         else:
             logging.warning("Turbine with outlet below T0 not implemented in exergoeconomics yet!")
-        
+
         # --- Auxiliary equation for shaft power equality ---
-        power_outlets = [outlet for outlet in self.outl.values()
-                        if outlet.get("kind") == "power" and outlet.get("source_component") and outlet.get("target_component")]
+        power_outlets = [
+            outlet
+            for outlet in self.outl.values()
+            if outlet.get("kind") == "power" and outlet.get("source_component") and outlet.get("target_component")
+        ]
         if len(power_outlets) > 1:
             ref = power_outlets[0]
             ref_idx = ref["CostVar_index"]["exergy"]
@@ -289,7 +291,7 @@ class Turbine(Component):
                 equations[counter] = {
                     "kind": "aux_p_rule",
                     "objects": [self.name],
-                    "property": "c_TOT (more power flows)"
+                    "property": "c_TOT (more power flows)",
                 }
                 counter += 1
 
@@ -356,7 +358,9 @@ class Turbine(Component):
             self.C_F = inlet.get("C_M", 0) - sum_C_M_out
 
         else:
-            logging.warning("Exergoeconomic balance of a turbine with outlet temperature larger than inlet is not implemented.")
+            logging.warning(
+                "Exergoeconomic balance of a turbine with outlet temperature larger than inlet is not implemented."
+            )
             self.C_P = np.nan
             self.C_F = np.nan
 
