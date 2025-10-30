@@ -1,7 +1,6 @@
 import logging
 
-from exerpy.components.component import Component
-from exerpy.components.component import component_registry
+from exerpy.components.component import Component, component_registry
 
 
 @component_registry
@@ -10,7 +9,7 @@ class Motor(Component):
     Class for exergy analysis of motors.
 
     This class performs exergy analysis calculations for motors, converting electrical
-    energy into mechanical energy. The exergy product is defined as the mechanical 
+    energy into mechanical energy. The exergy product is defined as the mechanical
     power output, while the exergy fuel is the electrical power input.
 
     Parameters
@@ -59,7 +58,7 @@ class Motor(Component):
         r"""
         Calculate the exergy balance of the motor.
 
-        Calculates the exergy product (mechanical power output), exergy fuel 
+        Calculates the exergy product (mechanical power output), exergy fuel
         (electrical power input), and the resulting exergy destruction and efficiency.
 
         Parameters
@@ -71,46 +70,45 @@ class Motor(Component):
         split_physical_exergy : bool
             Flag indicating whether physical exergy is split into thermal and mechanical components.
 
-        """      
+        """
 
-        if self.outl[0]['energy_flow'] > self.inl[0]['energy_flow']:
-            pruduct = self.inl[0]['energy_flow']
-            fuel = self.outl[0]['energy_flow']
+        if self.outl[0]["energy_flow"] > self.inl[0]["energy_flow"]:
+            pruduct = self.inl[0]["energy_flow"]
+            fuel = self.outl[0]["energy_flow"]
         else:
-            pruduct = self.outl[0]['energy_flow']
-            fuel = self.inl[0]['energy_flow']
+            pruduct = self.outl[0]["energy_flow"]
+            fuel = self.inl[0]["energy_flow"]
 
         # Exergy product is the mechanical power output
         self.E_P = pruduct
-        
+
         # Exergy fuel is the electrical power input
         self.E_F = fuel
-        
+
         # Calculate exergy destruction
         self.E_D = self.E_F - self.E_P
-        
+
         # Calculate exergy efficiency
         self.epsilon = self.calc_epsilon()
 
         # Log the results
         logging.info(
-            f"Motor exergy balance calculated: "
+            f"Exergy balance of Motor {self.name} calculated: "
             f"E_P={self.E_P:.2f}, E_F={self.E_F:.2f}, E_D={self.E_D:.2f}, "
             f"Efficiency={self.epsilon:.2%}"
         )
 
-    
     def aux_eqs(self, A, b, counter, T0, equations, chemical_exergy_enabled):
         """
         Auxiliary equations for the motor.
-        
+
         This function adds rows to the cost matrix A and the right-hand-side vector b to enforce
         the auxiliary cost relations for the motor. Since the motor converts mechanical
         or thermal energy to electrical energy, the auxiliary equations typically enforce:
-        
-        - No additional auxiliary equations are needed for motors as electrical energy 
+
+        - No additional auxiliary equations are needed for motors as electrical energy
           is pure exergy and the cost balance equations are sufficient.
-        
+
         Parameters
         ----------
         A : numpy.ndarray
@@ -125,7 +123,7 @@ class Motor(Component):
             Dictionary for storing equation labels.
         chemical_exergy_enabled : bool
             Flag indicating whether chemical exergy auxiliary equations should be added.
-        
+
         Returns
         -------
         A : numpy.ndarray
@@ -138,18 +136,18 @@ class Motor(Component):
             Updated dictionary with equation labels.
         """
         return [A, b, counter, equations]
-    
+
     def exergoeconomic_balance(self, T0, chemical_exergy_enabled=False):
         """
         Perform exergoeconomic balance calculations for the motor.
-        
+
         This method calculates various exergoeconomic parameters including:
         - Cost rates of product (C_P) and fuel (C_F)
         - Specific cost of product (c_P) and fuel (c_F)
         - Cost rate of exergy destruction (C_D)
         - Relative cost difference (r)
         - Exergoeconomic factor (f)
-        
+
         Parameters
         ----------
         T0 : float
@@ -163,12 +161,12 @@ class Motor(Component):
         """
         self.C_P = self.outl[0].get("C_TOT", 0)
         self.C_F = self.inl[0].get("C_TOT", 0)
-        
+
         if self.E_P == 0 or self.E_F == 0:
             raise ValueError(f"E_P or E_F is zero; cannot compute specific costs for component: {self.name}.")
-        
+
         self.c_P = self.C_P / self.E_P
         self.c_F = self.C_F / self.E_F
-        self.C_D = self.c_F * self.E_D   # Ensure that self.E_D is computed beforehand.
+        self.C_D = self.c_F * self.E_D  # Ensure that self.E_D is computed beforehand.
         self.r = (self.C_P - self.C_F) / self.C_F
         self.f = self.Z_costs / (self.Z_costs + self.C_D) if (self.Z_costs + self.C_D) != 0 else 0

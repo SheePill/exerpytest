@@ -8,17 +8,15 @@ logging.basicConfig(level=logging.WARNING, format="%(asctime)s - %(levelname)s -
 from exerpy import ExergyAnalysis
 
 # Define the path to the Ebsilon model file
-model_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "hp.ebs"))
+model_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "csp_simple.ebs"))
 
 # Initialize the exergy analysis with the simulation path
 ean = ExergyAnalysis.from_ebsilon(model_path, split_physical_exergy=False)
 
-fuel = {"inputs": ["E1", "E2", "E3"], "outputs": []}
+fuel = {"inputs": ["1"], "outputs": ["4"]}
 
-product = {"inputs": ["23"], "outputs": ["21"]}
+product = {"inputs": ["8"], "outputs": ["5"]}
 
-loss = {"inputs": ["13"], "outputs": ["11"]}
-
-ean.analyse(E_F=fuel, E_P=product, E_L=loss)
+ean.analyse(E_F=fuel, E_P=product)
 ean.exergy_results()
-ean.export_to_json("examples/heatpump/hp_ebs.json")
+ean.export_to_json("examples/csp/csp_simple_ebs.json")
