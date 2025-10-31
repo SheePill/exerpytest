@@ -988,6 +988,7 @@ connector_mapping = {
     8: {  # Pump
         1: 0,  # Connector 1 in Ebsilon is inlet(0)
         2: 0,  # Connector 2 in Ebsilon is outlet(0)
+        3: 1,  # Power inlet
     },
     9: {  # Feed Water Container / De Aerator
         1: 0,  # Inlet boiling water
@@ -1050,6 +1051,7 @@ connector_mapping = {
     24: {  # Compressor / Fan
         1: 0,  # Connector 1 in Ebsilon is inlet(0)
         2: 0,  # Connector 2 in Ebsilon is outlet(0)
+        3: 0,  # Power inlet
     },
     25: {  # Air Preheater
         1: 1,  # Inlet cold stream

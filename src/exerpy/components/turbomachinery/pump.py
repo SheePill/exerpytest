@@ -99,8 +99,15 @@ class Pump(Component):
             Flag indicating whether physical exergy is split into thermal and mechanical components.
 
         """
-        # Get power flow if not already available
-        if self.P is None:
+        # Get power flow
+        if (
+            1 in self.inl
+            and self.inl[1] is not None
+            and self.inl[1].get("kind") == "power"
+            and "energy_flow" in self.inl[1]
+        ):
+            self.P = self.inl[1]["energy_flow"]
+        else:
             self.P = self.outl[0]["m"] * (self.outl[0]["h"] - self.inl[0]["h"])
 
         # First, check for the invalid case: outlet temperature smaller than inlet temperature.

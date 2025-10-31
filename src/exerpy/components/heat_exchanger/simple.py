@@ -326,7 +326,7 @@ class SimpleHeatExchanger(Component):
                     self.E_P = outlet["m"] * outlet["e_PH"]
                     self.E_F = inlet["m"] * inlet["e_PH"]
 
-            elif inlet["T"] <= T0 and outlet["T"] <= T0:
+            elif inlet["T"] <= T0 and outlet["T"] < T0:
                 if split_physical_exergy:
                     self.E_P = outlet["m"] * (outlet["e_T"] - inlet["e_T"])
                     self.E_F = self.E_P + inlet["m"] * (inlet["e_M"] - outlet["m"] * outlet["e_M"])
@@ -353,7 +353,7 @@ class SimpleHeatExchanger(Component):
                 else:
                     self.E_P = outlet["m"] * (outlet["e_PH"] - inlet["e_PH"])
                     self.E_F = outlet["m"] * (outlet["e_PH"] - inlet["e_PH"])
-            elif inlet["T"] < T0 and outlet["T"] > T0:
+            elif inlet["T"] < T0 and outlet["T"] >= T0:
                 if split_physical_exergy:
                     self.E_P = outlet["m"] * (outlet["e_T"] + inlet["e_T"])
                     self.E_F = inlet["m"] * inlet["e_T"] + (inlet["m"] * inlet["e_M"] - outlet["m"] * outlet["e_M"])
@@ -361,7 +361,7 @@ class SimpleHeatExchanger(Component):
                     self.E_P = outlet["m"] * (outlet["e_PH"] - inlet["e_PH"])
                     self.E_F = outlet["m"] * (outlet["e_PH"] - inlet["e_PH"])
 
-            elif inlet["T"] < T0 and outlet["T"] < T0:
+            elif inlet["T"] < T0 and outlet["T"] <= T0:
                 if split_physical_exergy:
                     self.E_P = (
                         np.nan
@@ -412,61 +412,92 @@ class SimpleHeatExchanger(Component):
             "The exergoeconomic analysis of SimpleHeatExchanger is not implemented yet. "
             "This method will be implemented in a future release."
         )
-        r"""
-        Add auxiliary cost equations for the heat exchanger.
 
-        For all cases:
+        # Extract inlet and outlet
+        inlet = self.inl[0]
+        outlet = self.outl[0]
 
-        .. math::
-            -\frac{1}{\dot{E}^{\mathrm{T}}_{\mathrm{out}}}\,\dot{C}^{\mathrm{T}}_{\mathrm{out}}
-            + \frac{1}{\dot{E}^{\mathrm{T}}_{\mathrm{in}}}\,\dot{C}^{\mathrm{Tc}}_{\mathrm{in}}
-            = 0
+        # Calculate heat transfer Q
+        Q = outlet["m"] * outlet["h"] - inlet["m"] * inlet["h"]
 
-        F rule for mechanical exergy:
+        # Extract temperatures
+        T_in = inlet["T"]
+        T_out = outlet["T"]
 
-        .. math::
-            -\frac{1}{\dot{E}^{\mathrm{M}}_{\mathrm{out}}\,\dot{C}^{\mathrm{M}}_{\mathrm{out}}
-            + \frac{1}{\dot{E}^{\mathrm{M}}_{\mathrm{in}}\,\dot{C}^{\mathrm{M}}_{\mathrm{in}}
-            = 0
-
-        F rule for chemical exergy:
-
-        .. math::
-            -\frac{1}{\dot{E}^{\mathrm{CH}}_{\mathrm{out}}}\,\dot{C}^{\mathrm{CH}}_{\mathrm{out}}
-            + \frac{1}{\dot{E}^{\mathrm{CH}}_{\mathrm{in}}}\,\dot{C}^{\mathrm{CH}}_{\mathrm{in}}
-            = 0
-
-        """
-        """# For all cases: c_Tin = c_Tout
-        A[counter, self.inl[0]["CostVar_index"]["T"]] = (1 / self.inl[0]["e_T"]
-                                                        if self.inl[0]["e_T"] != 0 else 1)
-        A[counter, self.outl[0]["CostVar_index"]["T"]] = (-1 / self.outl[0]["e_T"]
-                                                        if self.outl[0]["e_T"] != 0 else -1)
-        equations[counter] = f"aux_equality_therm_{self.outl[0]['name']}"
-
+        # Equality equation for mechanical exergy costs (c_M,in = c_M,out)
+        A[counter, inlet["CostVar_index"]["M"]] = 1 / inlet["E_M"] if inlet["e_M"] != 0 else 1
+        A[counter, outlet["CostVar_index"]["M"]] = -1 / outlet["E_M"] if outlet["e_M"] != 0 else -1
+        equations[counter] = {
+            "kind": "aux_equality",
+            "objects": [self.name, inlet["name"], outlet["name"]],
+            "property": "c_M",
+        }
         b[counter] = 0
+        counter += 1
 
-        # For alle cases: c_Min = c_Mout
-        A[counter+1, self.inl[0]["CostVar_index"]["M"]] = (1 / self.inl[0]["e_M"]
-                                                            if self.inl[0]["e_M"] != 0 else 1)
-        A[counter+1, self.outl[0]["CostVar_index"]["M"]] = (-1 / self.outl[0]["e_M"]
-                                                            if self.outl[0]["e_M"] != 0 else 1)
-        equations[counter+1] = f"aux_equality_mech_{self.outl[0]['name']}"
-        b[counter+1] = 0
-
-        # For all cases: c_CHin = c_CHout
+        # Equality equation for chemical exergy costs (c_CH,in = c_CH,out)
         if chemical_exergy_enabled:
-            A[counter+2, self.inl[0]["CostVar_index"]["CH"]] = (1 / self.inl[0]["e_CH"]
-                                                                if self.inl[0]["e_CH"] != 0 else 1)
-            A[counter+2, self.outl[0]["CostVar_index"]["CH"]] = (-1 / self.outl[0]["e_CH"]
-                                                                if self.outl[0]["e_CH"] != 0 else 1)
-            equations[counter+2] = f"aux_equality_chem_{self.outl[0]['name']}"
-            b[counter+2] = 0
-            counter += 3
-        else:
-            counter += 2
+            A[counter, inlet["CostVar_index"]["CH"]] = 1 / inlet["E_CH"] if inlet["e_CH"] != 0 else 1
+            A[counter, outlet["CostVar_index"]["CH"]] = -1 / outlet["E_CH"] if outlet["e_CH"] != 0 else -1
+            equations[counter] = {
+                "kind": "aux_equality",
+                "objects": [self.name, inlet["name"], outlet["name"]],
+                "property": "c_CH",
+            }
+            b[counter] = 0
+            counter += 1
 
-        return A, b, counter, equations"""
+        # Thermal exergy cost equations
+
+        # Case 1: Heat is released (Q < 0)
+        if Q < 0:
+            # Case 1.1: Both streams above ambient temperature
+            if T_in >= T0 and T_out >= T0:
+                # Apply F-rule to thermal exergy (c_T,in = c_T,out)
+                A[counter, inlet["CostVar_index"]["T"]] = 1 / inlet["E_T"] if inlet["e_T"] != 0 else 1
+                A[counter, outlet["CostVar_index"]["T"]] = -1 / outlet["E_T"] if outlet["e_T"] != 0 else -1
+                equations[counter] = {
+                    "kind": "aux_f_rule",
+                    "objects": [self.name, inlet["name"], outlet["name"]],
+                    "property": "c_T",
+                }
+                b[counter] = 0
+                counter += 1
+
+            elif T_in >= T0 and T_out < T0:
+                # Tricky case: inlet above T0, outlet below T0
+                logging.warning(
+                    f"SimpleHeatExchanger '{self.name}': Stream crossing ambient temperature "
+                    f"during heat release not implemented in exergoeconomics yet!"
+                )
+
+            else:
+                # Tricky case: both streams below T0 while heat is released
+                logging.warning(
+                    f"SimpleHeatExchanger '{self.name}': Both streams below T0 during heat release "
+                    f"not implemented in exergoeconomics yet!"
+                )
+
+        # Case 2: Heat is added (Q > 0)
+        elif Q > 0:
+            # Case 2.1: Both streams below ambient temperature
+            if T_in < T0 and T_out < T0:
+                # No auxiliary equation needed for thermal exergy
+                # The cost balance will determine c_T,out based on c_T,in and c_heat
+                pass
+
+            elif T_in < T0 and T_out >= T0:
+                # Tricky case: inlet below T0, outlet above T0
+                logging.warning(
+                    f"SimpleHeatExchanger '{self.name}': Stream crossing ambient temperature "
+                    f"during heat absorption not implemented in exergoeconomics yet!"
+                )
+
+            # Case 2.2: Both streams above ambient temperature
+            elif T_in >= T0 and T_out >= T0:
+                # No auxiliary equation needed for thermal exergy
+                # The cost balance will determine c_T,out based on c_T,in and c_heat
+                pass
 
     def exergoeconomic_balance(self, T0, chemical_exergy_enabled=False):
         r"""

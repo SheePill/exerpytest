@@ -87,8 +87,19 @@ class Turbine(Component):
         split_physical_exergy : bool
             Flag indicating whether physical exergy is split into thermal and mechanical components.
         """
-        # Get power flow if not already available
-        if self.P is None:
+        # Get net power flow
+        net_power = 0.0  # Initialize to 0.0, not None
+        for idx, conn in self.inl.items():
+            if conn is not None and conn.get("kind") == "power" and "energy_flow" in conn:
+                net_power -= conn["energy_flow"]  # Subtract inlet power
+        for idx, conn in self.outl.items():
+            if conn is not None and conn.get("kind") == "power" and "energy_flow" in conn:
+                net_power += conn["energy_flow"]  # Add outlet power
+
+        # Use net_power if available, otherwise calculate from enthalpy balance
+        if net_power != 0.0:
+            self.P = abs(net_power)
+        else:
             self.P = self._total_outlet("m", "h") - self.inl[0]["m"] * self.inl[0]["h"]
 
         # Case 1: Both temperatures above ambient
@@ -165,7 +176,8 @@ class Turbine(Component):
         """
         total = 0.0
         for outlet in self.outl.values():
-            if outlet and mass_flow in outlet and property_name in outlet:
+            # Skip power connections; treat missing "kind" as material for backward compatibility
+            if outlet and outlet.get("kind", "material") != "power" and mass_flow in outlet and property_name in outlet:
                 total += outlet[mass_flow] * outlet[property_name]
         return total
 

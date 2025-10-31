@@ -388,9 +388,10 @@ def add_total_exergy_flow(my_json, split_physical_exergy):
                         inlet = inlet_conns[0]
                         outlet = outlet_conns[0]
                         # Calculate the heat exergy difference using the selected key:
-                        conn_data["E"] = inlet.get(exergy_key, 0) * inlet.get("m", 0) - outlet.get(
-                            exergy_key, 0
-                        ) * outlet.get("m", 0)
+                        conn_data["E"] = abs(
+                            inlet.get(exergy_key, 0) * inlet.get("m", 0)
+                            - outlet.get(exergy_key, 0) * outlet.get("m", 0)
+                        )
                     else:
                         conn_data["E"] = None
                         logging.warning(
