@@ -408,11 +408,6 @@ class SimpleHeatExchanger(Component):
         The exergoeconomic analysis of SimpleHeatExchanger is not implemented yet.
         """
 
-        logging.error(
-            "The exergoeconomic analysis of SimpleHeatExchanger is not implemented yet. "
-            "This method will be implemented in a future release."
-        )
-
         # Extract inlet and outlet
         inlet = self.inl[0]
         outlet = self.outl[0]
@@ -499,19 +494,13 @@ class SimpleHeatExchanger(Component):
                 # The cost balance will determine c_T,out based on c_T,in and c_heat
                 pass
 
+        return A, b, counter, equations
+
     def exergoeconomic_balance(self, T0, chemical_exergy_enabled=False):
         r"""
-        This function must be implemented in the future.
-
-        The exergoeconomic analysis of SimpleHeatExchanger is not implemented yet.
-        """
-
-        logging.error(
-            "The exergoeconomic analysis of SimpleHeatExchanger is not implemented yet. "
-            "This method will be implemented in a future release."
-        )
-        r"""
         Perform exergoeconomic cost balance for the simple heat exchanger.
+
+        The general exergoeconomic balance equation is:
 
         .. math::
             \dot{C}^{\mathrm{T}}_{\mathrm{in}}
@@ -521,30 +510,25 @@ class SimpleHeatExchanger(Component):
             + \dot{Z}
             = 0
 
-        In case the chemical exergy of the streams is know:
+        In case the chemical exergy of the streams is known:
 
         .. math::
-            \dot{C}^{\mathrm{CH}}_{\mathrm{in},1} =
-            \dot{C}^{\mathrm{CH}}_{\mathrm{out},1}
+            \dot{C}^{\mathrm{CH}}_{\mathrm{in}} =
+            \dot{C}^{\mathrm{CH}}_{\mathrm{out}}
 
-        .. math::
-            \dot{C}^{\mathrm{CH}}_{\mathrm{in},2} =
-            \dot{C}^{\mathrm{CH}}_{\mathrm{out},2}
+        This method computes cost rates for product and fuel, and derives
+        exergoeconomic indicators based on the operating conditions.
 
-        This method computes cost coefficients and ratios:
-
-        **Heat release** :math:\dot{Q}<0
+        **Heat release** (:math:`\dot{Q} < 0`)
 
         Case 1: Both streams above ambient temperature
 
         .. math::
-
             \dot{E}_{\mathrm{P}}
             = \dot{E}^{\mathrm{T}}_{\mathrm{out}}
             - \dot{E}^{\mathrm{T}}_{\mathrm{in}}
 
         .. math::
-
             \dot{E}_{\mathrm{F}}
             = \dot{E}^{\mathrm{PH}}_{\mathrm{in}}
             - \dot{E}^{\mathrm{PH}}_{\mathrm{out}}
@@ -552,12 +536,10 @@ class SimpleHeatExchanger(Component):
         Case 2: Inlet above and outlet below ambient temperature
 
         .. math::
-
             \dot{E}_{\mathrm{P}}
             = \dot{E}^{\mathrm{T}}_{\mathrm{out}}
 
         .. math::
-
             \dot{E}_{\mathrm{F}}
             = \dot{E}^{\mathrm{T}}_{\mathrm{in}}
             + \dot{E}^{\mathrm{T}}_{\mathrm{out}}
@@ -567,31 +549,27 @@ class SimpleHeatExchanger(Component):
         Case 3: Both streams below ambient temperature
 
         .. math::
-
             \dot{E}_{\mathrm{P}}
             = \dot{E}^{\mathrm{T}}_{\mathrm{out}}
             - \dot{E}^{\mathrm{T}}_{\mathrm{in}}
 
         .. math::
-
             \dot{E}_{\mathrm{F}}
             = \bigl(\dot{E}^{\mathrm{T}}_{\mathrm{out}}
             - \dot{E}^{\mathrm{T}}_{\mathrm{in}}\bigr)
             + \bigl(\dot{E}^{\mathrm{M}}_{\mathrm{in}}
             - \dot{E}^{\mathrm{M}}_{\mathrm{out}}\bigr)
 
-        **Heat injection** :math:\dot{Q}
+        **Heat injection** (:math:`\dot{Q} > 0`)
 
         Case 1: Both streams above ambient temperature
 
         .. math::
-
             \dot{E}_{\mathrm{P}}
             = \dot{E}^{\mathrm{PH}}_{\mathrm{out}}
             - \dot{E}^{\mathrm{PH}}_{\mathrm{in}}
 
         .. math::
-
             \dot{E}_{\mathrm{F}}
             = \dot{E}^{\mathrm{T}}_{\mathrm{out}}
             - \dot{E}^{\mathrm{T}}_{\mathrm{in}}
@@ -599,13 +577,11 @@ class SimpleHeatExchanger(Component):
         Case 2: Inlet below and outlet above ambient temperature
 
         .. math::
-
             \dot{E}_{\mathrm{P}}
             = \dot{E}^{\mathrm{T}}_{\mathrm{out}}
             + \dot{E}^{\mathrm{T}}_{\mathrm{in}}
 
         .. math::
-
             \dot{E}_{\mathrm{F}}
             = \dot{E}^{\mathrm{T}}_{\mathrm{in}}
             + \bigl(\dot{E}^{\mathrm{M}}_{\mathrm{in}}
@@ -614,7 +590,6 @@ class SimpleHeatExchanger(Component):
         Case 3: Both streams below ambient temperature
 
         .. math::
-
             \dot{E}_{\mathrm{P}}
             = \dot{E}^{\mathrm{T}}_{\mathrm{in}}
             - \dot{E}^{\mathrm{T}}_{\mathrm{out}}
@@ -622,22 +597,36 @@ class SimpleHeatExchanger(Component):
             - \dot{E}^{\mathrm{M}}_{\mathrm{in}}\bigr)
 
         .. math::
-
             \dot{E}_{\mathrm{F}}
             = \dot{E}^{\mathrm{T}}_{\mathrm{in}}
             - \dot{E}^{\mathrm{T}}_{\mathrm{out}}
 
-        Fully dissipative or :math:\dot{Q}=0
+        **Fully dissipative or** :math:`\dot{Q} = 0`
 
         .. math::
-
             \dot{E}_{\mathrm{P}} = \mathrm{NaN}
 
         .. math::
-
             \dot{E}_{\mathrm{F}}
             = \dot{E}^{\mathrm{PH}}_{\mathrm{in}}
             - \dot{E}^{\mathrm{PH}}_{\mathrm{out}}
+
+        **Calculated exergoeconomic indicators:**
+
+        .. math::
+            c_{\mathrm{F}} = \frac{\dot{C}_{\mathrm{F}}}{\dot{E}_{\mathrm{F}}}
+
+        .. math::
+            c_{\mathrm{P}} = \frac{\dot{C}_{\mathrm{P}}}{\dot{E}_{\mathrm{P}}}
+
+        .. math::
+            \dot{C}_{\mathrm{D}} = c_{\mathrm{F}} \cdot \dot{E}_{\mathrm{D}}
+
+        .. math::
+            r = \frac{c_{\mathrm{P}} - c_{\mathrm{F}}}{c_{\mathrm{F}}}
+
+        .. math::
+            f = \frac{\dot{Z}}{\dot{Z} + \dot{C}_{\mathrm{D}}}
 
         Parameters
         ----------
@@ -645,4 +634,75 @@ class SimpleHeatExchanger(Component):
             Ambient temperature (K).
         chemical_exergy_enabled : bool, optional
             If True, chemical exergy is considered in the calculations.
+            Default is False.
+
+        Attributes Set
+        --------------
+        C_P : float
+            Cost rate of product (currency/time).
+        C_F : float
+            Cost rate of fuel (currency/time).
+        c_P : float
+            Specific cost of product (currency/energy).
+        c_F : float
+            Specific cost of fuel (currency/energy).
+        C_D : float
+            Cost rate of exergy destruction (currency/time).
+        r : float
+            Relative cost difference (dimensionless).
+        f : float
+            Exergoeconomic factor (dimensionless).
         """
+        inlet = self.inl[0]
+        outlet = self.outl[0]
+
+        # Determine heat transfer direction
+        Q = outlet["m"] * outlet["h"] - inlet["m"] * inlet["h"]
+
+        # Case 1: Heat is released (Q < 0)
+        if Q < 0:
+            if inlet["T"] >= T0 and outlet["T"] >= T0:
+                # Both streams above ambient
+                self.C_P = outlet["C_T"] - inlet["C_T"]
+                self.C_F = inlet["C_PH"] - outlet["C_PH"]
+            elif inlet["T"] >= T0 and outlet["T"] < T0:
+                # Inlet above, outlet below ambient
+                self.C_P = outlet["C_T"]
+                self.C_F = inlet["C_T"] + outlet["C_T"] + (inlet["C_M"] - outlet["C_M"])
+            elif inlet["T"] <= T0 and outlet["T"] < T0:
+                # Both streams below ambient
+                self.C_P = outlet["C_T"] - inlet["C_T"]
+                self.C_F = self.C_P + (inlet["C_M"] - outlet["C_M"])
+            else:
+                self.C_P = np.nan
+                self.C_F = np.nan
+
+        # Case 2: Heat is added (Q > 0)
+        elif Q > 0:
+            if inlet["T"] >= T0 and outlet["T"] >= T0:
+                # Both streams above ambient
+                self.C_P = outlet["C_PH"] - inlet["C_PH"]
+                self.C_F = outlet["C_T"] - inlet["C_T"]
+            elif inlet["T"] < T0 and outlet["T"] >= T0:
+                # Inlet below, outlet above ambient
+                self.C_P = outlet["C_T"] + inlet["C_T"]
+                self.C_F = inlet["C_T"] + (inlet["C_M"] - outlet["C_M"])
+            elif inlet["T"] < T0 and outlet["T"] <= T0:
+                # Both streams below ambient
+                self.C_P = inlet["C_T"] - outlet["C_T"] + (outlet["C_M"] - inlet["C_M"])
+                self.C_F = inlet["C_T"] - outlet["C_T"]
+            else:
+                self.C_P = np.nan
+                self.C_F = np.nan
+
+        # Case 3: Fully dissipative or Q == 0
+        else:
+            self.C_P = np.nan
+            self.C_F = inlet["C_PH"] - outlet["C_PH"]
+
+        # Calculate specific costs and exergoeconomic indicators
+        self.c_F = self.C_F / self.E_F if self.E_F else np.nan
+        self.c_P = self.C_P / self.E_P if self.E_P else np.nan
+        self.C_D = self.c_F * self.E_D if self.E_D else np.nan
+        self.r = (self.c_P - self.c_F) / self.c_F if self.c_F else np.nan
+        self.f = self.Z_costs / (self.Z_costs + self.C_D) if self.C_D else np.nan

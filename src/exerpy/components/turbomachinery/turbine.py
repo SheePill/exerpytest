@@ -310,39 +310,114 @@ class Turbine(Component):
         return A, b, counter, equations
 
     def exergoeconomic_balance(self, T0, chemical_exergy_enabled=False):
-        """
-        Perform exergoeconomic balance calculations for the turbine.
+        r"""
+        Perform exergoeconomic cost balance for the turbine.
 
-        The turbine may have multiple power outputs and multiple material outputs. In this
-        function the cost of power is computed as the sum of C_TOT from all inlet streams of kind "power".
-        Material outlet costs are summed over all outlets of kind "material". The cost balance is then
-        computed according to the following cases:
+        The general exergoeconomic balance equation is:
 
-        Case 1 (both inlet and first outlet above T0):
-            C_P = (total power cost)
-            C_F = C_PH_inlet - (sum of C_PH from material outlets)
+        .. math::
+            \dot{C}^{\mathrm{T}}_{\mathrm{in}}
+            + \dot{C}^{\mathrm{M}}_{\mathrm{in}}
+            - \dot{C}^{\mathrm{T}}_{\mathrm{out}}
+            - \dot{C}^{\mathrm{M}}_{\mathrm{out}}
+            + \dot{Z}
+            = 0
 
-        Case 2 (inlet above T0, outlet at or below T0):
-            C_P = (total power cost) + (sum of C_T from material outlets)
-            C_F = C_T_inlet + (C_M_inlet - (sum of C_M from material outlets))
+        In case the chemical exergy of the streams is known:
 
-        Case 3 (both inlet and outlet at or below T0):
-            C_P = (total power cost) + ((sum of C_T from material outlets) - C_T_inlet)
-            C_F = C_M_inlet - (sum of C_M from material outlets)
+        .. math::
+            \dot{C}^{\mathrm{CH}}_{\mathrm{in}} =
+            \dot{C}^{\mathrm{CH}}_{\mathrm{out}}
 
-        Finally, the specific fuel cost (c_F), specific product cost (c_P), total cost destruction (C_D),
-        relative difference (r), and exergoeconomic factor (f) are calculated.
+        This method computes cost rates for product and fuel, and derives
+        exergoeconomic indicators. The turbine may have multiple power outputs
+        and multiple material outlets. The product cost includes the total cost
+        of all power streams, while material outlet costs are summed accordingly.
+
+        **Case 1: Inlet and outlet above ambient temperature**
+
+        Both inlet and first material outlet satisfy :math:`T \geq T_0`:
+
+        .. math::
+            \dot{C}_{\mathrm{P}}
+            = \sum \dot{C}^{\mathrm{TOT}}_{\mathrm{power,out}}
+
+        .. math::
+            \dot{C}_{\mathrm{F}}
+            = \dot{C}^{\mathrm{PH}}_{\mathrm{in}}
+            - \sum \dot{C}^{\mathrm{PH}}_{\mathrm{material,out}}
+
+        **Case 2: Inlet above and outlet at or below ambient temperature**
+
+        Inlet satisfies :math:`T > T_0` and first material outlet :math:`T \leq T_0`:
+
+        .. math::
+            \dot{C}_{\mathrm{P}}
+            = \sum \dot{C}^{\mathrm{TOT}}_{\mathrm{power,out}}
+            + \sum \dot{C}^{\mathrm{T}}_{\mathrm{material,out}}
+
+        .. math::
+            \dot{C}_{\mathrm{F}}
+            = \dot{C}^{\mathrm{T}}_{\mathrm{in}}
+            + \bigl(\dot{C}^{\mathrm{M}}_{\mathrm{in}}
+            - \sum \dot{C}^{\mathrm{M}}_{\mathrm{material,out}}\bigr)
+
+        **Case 3: Both inlet and outlet at or below ambient temperature**
+
+        Both inlet and first material outlet satisfy :math:`T \leq T_0`:
+
+        .. math::
+            \dot{C}_{\mathrm{P}}
+            = \sum \dot{C}^{\mathrm{TOT}}_{\mathrm{power,out}}
+            + \bigl(\sum \dot{C}^{\mathrm{T}}_{\mathrm{material,out}}
+            - \dot{C}^{\mathrm{T}}_{\mathrm{in}}\bigr)
+
+        .. math::
+            \dot{C}_{\mathrm{F}}
+            = \dot{C}^{\mathrm{M}}_{\mathrm{in}}
+            - \sum \dot{C}^{\mathrm{M}}_{\mathrm{material,out}}
+
+        **Calculated exergoeconomic indicators:**
+
+        .. math::
+            c_{\mathrm{F}} = \frac{\dot{C}_{\mathrm{F}}}{\dot{E}_{\mathrm{F}}}
+
+        .. math::
+            c_{\mathrm{P}} = \frac{\dot{C}_{\mathrm{P}}}{\dot{E}_{\mathrm{P}}}
+
+        .. math::
+            \dot{C}_{\mathrm{D}} = c_{\mathrm{F}} \cdot \dot{E}_{\mathrm{D}}
+
+        .. math::
+            r = \frac{c_{\mathrm{P}} - c_{\mathrm{F}}}{c_{\mathrm{F}}}
+
+        .. math::
+            f = \frac{\dot{Z}}{\dot{Z} + \dot{C}_{\mathrm{D}}}
 
         Parameters
         ----------
         T0 : float
-            Ambient temperature.
+            Ambient temperature (K).
         chemical_exergy_enabled : bool, optional
             If True, chemical exergy is considered in the calculations.
-        Raises
-        ------
-        ValueError
-            If required cost values are missing.
+            Default is False.
+
+        Attributes Set
+        --------------
+        C_P : float
+            Cost rate of product (currency/time).
+        C_F : float
+            Cost rate of fuel (currency/time).
+        c_P : float
+            Specific cost of product (currency/energy).
+        c_F : float
+            Specific cost of fuel (currency/energy).
+        C_D : float
+            Cost rate of exergy destruction (currency/time).
+        r : float
+            Relative cost difference (dimensionless).
+        f : float
+            Exergoeconomic factor (dimensionless).
         """
         # Sum the cost of all outlet power streams.
         C_power_out = sum(stream.get("C_TOT", 0) for stream in self.outl.values() if stream.get("kind") == "power")

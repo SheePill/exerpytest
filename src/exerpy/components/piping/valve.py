@@ -446,27 +446,130 @@ class Valve(Component):
         return A, b, counter, equations
 
     def exergoeconomic_balance(self, T0, chemical_exergy_enabled=False):
-        """
-        Perform exergoeconomic balance calculations for the valve.
+        r"""
+        Perform exergoeconomic cost balance for the valve (throttling component).
 
-        This method calculates various exergoeconomic parameters including:
-        - Cost rates of product (C_P) and fuel (C_F)
-        - Specific cost of product (c_P) and fuel (c_F)
-        - Cost rate of exergy destruction (C_D)
-        - Relative cost difference (r)
-        - Exergoeconomic factor (f)
+        The valve is a throttling device that reduces pressure without doing work.
+        Unlike other components, a valve can be either **dissipative** (purely destructive)
+        or **productive** depending on temperature conditions and whether physical
+        exergy is split into thermal and mechanical components.
+
+        **Dissipative Valve (E_P is NaN):**
+
+        When the valve has no identifiable product (Cases 1, 4, or Cases 2-3 without split),
+        the entire exergy loss is considered destruction. The cost of fuel is the decrease
+        in physical exergy cost:
+
+        .. math::
+            \dot{C}_{\mathrm{F}} = \dot{C}_{\mathrm{in}}^{\mathrm{PH}} - \dot{C}_{\mathrm{out}}^{\mathrm{PH}}
+
+        .. math::
+            \dot{C}_{\mathrm{P}} = \text{NaN (no product)}
+
+        **Productive Valve (E_P has a value):**
+
+        When physical exergy is split (split_physical_exergy=True) and specific temperature
+        conditions are met, the valve can have a product:
+
+        *Case 2 (Inlet above T0, outlet below T0):*
+
+        The product is the thermal exergy at the outlet (cooling capacity), and the fuel
+        is the thermal exergy decrease plus the mechanical exergy loss:
+
+        .. math::
+            \dot{C}_{\mathrm{P}} = \dot{C}_{\mathrm{out}}^{\mathrm{T}}
+
+        .. math::
+            \dot{C}_{\mathrm{F}} = \dot{C}_{\mathrm{in}}^{\mathrm{T}} + (\dot{C}_{\mathrm{in}}^{\mathrm{M}} - \dot{C}_{\mathrm{out}}^{\mathrm{M}})
+
+        *Case 3 (Both inlet and outlet below T0):*
+
+        The product is the increase in thermal exergy (cooling capacity increase), and
+        the fuel is the mechanical exergy loss:
+
+        .. math::
+            \dot{C}_{\mathrm{P}} = \dot{C}_{\mathrm{out}}^{\mathrm{T}} - \dot{C}_{\mathrm{in}}^{\mathrm{T}}
+
+        .. math::
+            \dot{C}_{\mathrm{F}} = \dot{C}_{\mathrm{in}}^{\mathrm{M}} - \dot{C}_{\mathrm{out}}^{\mathrm{M}}
+
+        **Calculated exergoeconomic indicators:**
+
+        Specific cost of fuel:
+
+        .. math::
+            c_{\mathrm{F}} = \frac{\dot{C}_{\mathrm{F}}}{\dot{E}_{\mathrm{F}}}
+
+        Specific cost of product:
+
+        .. math::
+            c_{\mathrm{P}} = \frac{\dot{C}_{\mathrm{P}}}{\dot{E}_{\mathrm{P}}}
+
+        Cost rate of exergy destruction:
+
+        .. math::
+            \dot{C}_{\mathrm{D}} = c_{\mathrm{F}} \cdot \dot{E}_{\mathrm{D}}
+
+        Relative cost difference:
+
+        .. math::
+            r = \frac{c_{\mathrm{P}} - c_{\mathrm{F}}}{c_{\mathrm{F}}}
+
+        Exergoeconomic factor:
+
+        .. math::
+            f = \frac{\dot{Z}}{\dot{Z} + \dot{C}_{\mathrm{D}}}
 
         Parameters
         ----------
         T0 : float
-            Ambient temperature
+            Ambient temperature (K).
         chemical_exergy_enabled : bool, optional
             If True, chemical exergy is considered in the calculations.
+            Default is False.
+
+        Attributes Set
+        --------------
+        C_P : float or NaN
+            Cost rate of product (currency/time). NaN for dissipative valves.
+        C_F : float or NaN
+            Cost rate of fuel (currency/time).
+        c_P : float or NaN
+            Specific cost of product (currency/energy). NaN for dissipative valves.
+        c_F : float or NaN
+            Specific cost of fuel (currency/energy).
+        C_D : float or NaN
+            Cost rate of exergy destruction (currency/time).
+        r : float or NaN
+            Relative cost difference (dimensionless). NaN for dissipative valves.
+        f : float or NaN
+            Exergoeconomic factor (dimensionless).
 
         Notes
         -----
-        The exergoeconomic balance considers thermal (T), chemical (CH),
-        and mechanical (M) exergy components for the inlet and outlet streams.
+        The valve is unique among components because:
+
+        1. It typically has no capital cost (Z_costs ≈ 0), making the exergoeconomic
+        factor f close to zero.
+
+        2. It can be dissipative (no product) or productive (identifiable product)
+        depending on the analysis approach and temperature conditions.
+
+        3. For dissipative valves, many exergoeconomic parameters are NaN since there
+        is no identifiable product.
+
+        4. The relative cost difference r is calculated using specific costs (c_P and c_F)
+        rather than total cost rates, unlike generator and motor components.
+
+        5. The method handles NaN values throughout to accommodate both dissipative
+        and productive valve configurations.
+
+        The exergy destruction E_D and product/fuel definitions E_P and E_F must be
+        computed prior to calling this method (via exergy_balance).
+
+        For refrigeration cycles (Case 2) or cryogenic applications (Case 3), the
+        productive valve approach may be more appropriate. For typical throttling
+        applications, the dissipative approach is standard.
         """
         # Check if valve is dissipative
         if np.isnan(self.E_P):

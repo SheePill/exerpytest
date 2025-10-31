@@ -478,8 +478,20 @@ class ExergyAnalysis:
         # NON-MATERIAL CONNECTIONS
         non_material_connection_results = {"Connection": [], "Kind": [], "Energy Flow [kW]": [], "Exergy Flow [kW]": []}
 
+        # Create set of valid component names
+        valid_components = {comp.name for comp in self.components.values()}
+
         # Populate the dictionaries with exergy analysis data for each connection
         for conn_name, conn_data in self.connections.items():
+
+            # Filter: only include connections that have source OR target in self.components
+            is_part_of_the_system = (
+                conn_data.get("source_component") in valid_components
+                or conn_data.get("target_component") in valid_components
+            )
+            if not is_part_of_the_system:
+                continue
+
             # Separate material and non-material connections based on fluid type
             kind = conn_data.get("kind", None)
 
@@ -1292,7 +1304,9 @@ class ExergoeconomicAnalysis:
 
         # Step 4: Assign solutions to connections
         for conn_name, conn in self.connections.items():
-            is_part_of_the_system = conn.get("source_component") or conn.get("target_component")
+            is_part_of_the_system = (
+                conn.get("source_component") in self.components or conn.get("target_component") in self.components
+            )
             if not is_part_of_the_system:
                 continue
             else:
@@ -1716,9 +1730,25 @@ class ExergoeconomicAnalysis:
         c_CH_list = []
         c_TOT_list = []
 
+        # Create set of valid component names
+        valid_components = {comp.name for comp in self.components.values()}
+
         for _idx, row in df_mat.iterrows():
             conn_name = row["Connection"]
             conn_data = self.connections.get(conn_name, {})
+
+            # Verify connection is part of the system
+            is_part_of_the_system = (
+                conn_data.get("source_component") in valid_components
+                or conn_data.get("target_component") in valid_components
+            )
+            if not is_part_of_the_system:
+                # Skip this connection
+                C_T_list.append(np.nan)
+                C_M_list.append(np.nan)
+                # ... append nan for all other lists
+                continue
+
             kind = conn_data.get("kind", None)
             if kind == "material":
                 C_T = conn_data.get("C_T", None)

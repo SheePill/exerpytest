@@ -288,26 +288,118 @@ class Pump(Component):
         return A, b, new_counter, equations
 
     def exergoeconomic_balance(self, T0, chemical_exergy_enabled=False):
-        """
-        Perform exergoeconomic balance calculations for the pump.
+        r"""
+        Perform exergoeconomic cost balance for the pump.
 
-        This method calculates various exergoeconomic parameters including:
-        - Cost rates of product (C_P) and fuel (C_F)
-        - Specific cost of product (c_P) and fuel (c_F)
-        - Cost rate of exergy destruction (C_D)
-        - Relative cost difference (r)
-        - Exergoeconomic factor (f)
+        The general exergoeconomic balance equation is:
+
+        .. math::
+            \dot{C}^{\mathrm{T}}_{\mathrm{in}}
+            + \dot{C}^{\mathrm{M}}_{\mathrm{in}}
+            - \dot{C}^{\mathrm{T}}_{\mathrm{out}}
+            - \dot{C}^{\mathrm{M}}_{\mathrm{out}}
+            + \dot{Z}
+            = 0
+
+        In case the chemical exergy of the streams is known:
+
+        .. math::
+            \dot{C}^{\mathrm{CH}}_{\mathrm{in}} =
+            \dot{C}^{\mathrm{CH}}_{\mathrm{out}}
+
+        This method computes cost rates for product and fuel, and derives
+        exergoeconomic indicators. The pump consumes power (fuel) to increase
+        the exergy of the working fluid (product).
+
+        **Case 1: Both inlet and outlet above ambient temperature**
+
+        Both inlet and outlet satisfy :math:`T \geq T_0`:
+
+        .. math::
+            \dot{C}_{\mathrm{P}}
+            = \dot{C}^{\mathrm{PH}}_{\mathrm{out}}
+            - \dot{C}^{\mathrm{PH}}_{\mathrm{in}}
+
+        .. math::
+            \dot{C}_{\mathrm{F}}
+            = \dot{C}^{\mathrm{TOT}}_{\mathrm{power,in}}
+
+        **Case 2: Inlet at or below and outlet above ambient temperature**
+
+        Inlet satisfies :math:`T \leq T_0` and outlet :math:`T > T_0`:
+
+        .. math::
+            \dot{C}_{\mathrm{P}}
+            = \dot{C}^{\mathrm{T}}_{\mathrm{out}}
+            + \bigl(\dot{C}^{\mathrm{M}}_{\mathrm{out}}
+            - \dot{C}^{\mathrm{M}}_{\mathrm{in}}\bigr)
+
+        .. math::
+            \dot{C}_{\mathrm{F}}
+            = \dot{C}^{\mathrm{TOT}}_{\mathrm{power,in}}
+            + \dot{C}^{\mathrm{T}}_{\mathrm{in}}
+
+        **Case 3: Both inlet and outlet at or below ambient temperature**
+
+        Both inlet and outlet satisfy :math:`T \leq T_0`:
+
+        .. math::
+            \dot{C}_{\mathrm{P}}
+            = \dot{C}^{\mathrm{M}}_{\mathrm{out}}
+            - \dot{C}^{\mathrm{M}}_{\mathrm{in}}
+
+        .. math::
+            \dot{C}_{\mathrm{F}}
+            = \dot{C}^{\mathrm{TOT}}_{\mathrm{power,in}}
+            + \bigl(\dot{C}^{\mathrm{T}}_{\mathrm{in}}
+            - \dot{C}^{\mathrm{T}}_{\mathrm{out}}\bigr)
+
+        **Calculated exergoeconomic indicators:**
+
+        .. math::
+            c_{\mathrm{F}} = \frac{\dot{C}_{\mathrm{F}}}{\dot{E}_{\mathrm{F}}}
+
+        .. math::
+            c_{\mathrm{P}} = \frac{\dot{C}_{\mathrm{P}}}{\dot{E}_{\mathrm{P}}}
+
+        .. math::
+            \dot{C}_{\mathrm{D}} = c_{\mathrm{F}} \cdot \dot{E}_{\mathrm{D}}
+
+        .. math::
+            r = \frac{c_{\mathrm{P}} - c_{\mathrm{F}}}{c_{\mathrm{F}}}
+
+        .. math::
+            f = \frac{\dot{Z}}{\dot{Z} + \dot{C}_{\mathrm{D}}}
 
         Parameters
         ----------
         T0 : float
-            Ambient temperature
+            Ambient temperature (K).
         chemical_exergy_enabled : bool, optional
             If True, chemical exergy is considered in the calculations.
-        Notes
-        -----
-        The exergoeconomic balance considers thermal (T), chemical (CH),
-        and mechanical (M) exergy components for the inlet and outlet streams.
+            Default is False.
+
+        Attributes Set
+        --------------
+        C_P : float
+            Cost rate of product (currency/time).
+        C_F : float
+            Cost rate of fuel (currency/time).
+        c_P : float
+            Specific cost of product (currency/energy).
+        c_F : float
+            Specific cost of fuel (currency/energy).
+        C_D : float
+            Cost rate of exergy destruction (currency/time).
+        r : float
+            Relative cost difference (dimensionless).
+        f : float
+            Exergoeconomic factor (dimensionless).
+
+        Raises
+        ------
+        ValueError
+            If no inlet power stream is found.
         """
         # Retrieve the cost of power from the inlet stream of kind "power"
         power_cost = None

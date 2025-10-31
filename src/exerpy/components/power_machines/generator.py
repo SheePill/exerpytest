@@ -133,26 +133,94 @@ class Generator(Component):
         return [A, b, counter, equations]
 
     def exergoeconomic_balance(self, T0, chemical_exergy_enabled=False):
-        """
-        Perform exergoeconomic balance calculations for the generator.
+        r"""
+        Perform exergoeconomic cost balance for the generator (power-producing component).
 
-        This method calculates various exergoeconomic parameters including:
-        - Cost rates of product (C_P) and fuel (C_F)
-        - Specific cost of product (c_P) and fuel (c_F)
-        - Cost rate of exergy destruction (C_D)
-        - Relative cost difference (r)
-        - Exergoeconomic factor (f)
+        The generator is a power-producing component (e.g., electrical generator, turbine)
+        where mechanical/electrical work is extracted from a flowing stream. The general
+        exergoeconomic balance equation is:
+
+        .. math::
+            \dot{C}_{\mathrm{in}}^{\mathrm{TOT}} - \dot{C}_{\mathrm{out}}^{\mathrm{TOT}}
+            - \dot{C}_{\mathrm{P}} + \dot{Z} = 0
+
+        For a generator, the product is the power output (electrical or mechanical),
+        and the fuel is the exergy decrease in the working fluid:
+
+        .. math::
+            \dot{C}_{\mathrm{P}} = \dot{C}_{\mathrm{out}}^{\mathrm{TOT}}
+
+        .. math::
+            \dot{C}_{\mathrm{F}} = \dot{C}_{\mathrm{in}}^{\mathrm{TOT}}
+
+        **Calculated exergoeconomic indicators:**
+
+        Specific cost of fuel:
+
+        .. math::
+            c_{\mathrm{F}} = \frac{\dot{C}_{\mathrm{F}}}{\dot{E}_{\mathrm{F}}}
+
+        Specific cost of product:
+
+        .. math::
+            c_{\mathrm{P}} = \frac{\dot{C}_{\mathrm{P}}}{\dot{E}_{\mathrm{P}}}
+
+        Cost rate of exergy destruction:
+
+        .. math::
+            \dot{C}_{\mathrm{D}} = c_{\mathrm{F}} \cdot \dot{E}_{\mathrm{D}}
+
+        Relative cost difference:
+
+        .. math::
+            r = \frac{\dot{C}_{\mathrm{P}} - \dot{C}_{\mathrm{F}}}{\dot{C}_{\mathrm{F}}}
+
+        Exergoeconomic factor:
+
+        .. math::
+            f = \frac{\dot{Z}}{\dot{Z} + \dot{C}_{\mathrm{D}}}
 
         Parameters
         ----------
         T0 : float
-            Ambient temperature
+            Ambient temperature (K).
         chemical_exergy_enabled : bool, optional
             If True, chemical exergy is considered in the calculations.
+            Default is False.
+
+        Attributes Set
+        --------------
+        C_P : float
+            Cost rate of product (currency/time).
+        C_F : float
+            Cost rate of fuel (currency/time).
+        c_P : float
+            Specific cost of product (currency/energy).
+        c_F : float
+            Specific cost of fuel (currency/energy).
+        C_D : float
+            Cost rate of exergy destruction (currency/time).
+        r : float
+            Relative cost difference (dimensionless).
+        f : float
+            Exergoeconomic factor (dimensionless).
+
+        Raises
+        ------
+        ValueError
+            If E_P or E_F is zero, preventing computation of specific costs.
+
         Notes
         -----
-        The exergoeconomic balance considers thermal (T), chemical (CH),
-        and mechanical (M) exergy components for the inlet and outlet streams.
+        Unlike other components, the generator does not add Z_costs to close the
+        cost balance in the C_P calculation. The cost balance is determined by
+        the total exergy costs of inlet and outlet streams.
+
+        The relative cost difference r is calculated using total cost rates
+        (C_P and C_F) rather than specific costs (c_P and c_F), which is
+        mathematically equivalent for this component type.
+
+        The exergy destruction E_D must be computed prior to calling this method.
         """
         self.C_P = self.outl[0].get("C_TOT", 0)
         self.C_F = self.inl[0].get("C_TOT", 0)

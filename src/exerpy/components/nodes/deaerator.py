@@ -268,27 +268,140 @@ class Deaerator(Component):
         return A, b, counter, equations
 
     def exergoeconomic_balance(self, T0, chemical_exergy_enabled=False):
-        """
-        Perform exergoeconomic balance calculations for the deaerator.
+        r"""
+        Perform exergoeconomic cost balance for the deaerator (mixing component).
 
-        This method calculates various exergoeconomic parameters including:
-        - Cost rates of product (C_P) and fuel (C_F)
-        - Specific cost of product (c_P) and fuel (c_F)
-        - Cost rate of exergy destruction (C_D)
-        - Relative cost difference (r)
-        - Exergoeconomic factor (f)
+        The deaerator is a mixing component where multiple streams combine. The general
+        exergoeconomic balance equation is:
+
+        .. math::
+            \sum_{\mathrm{in}} \left(\dot{C}^{\mathrm{T}}_{\mathrm{in}}
+            + \dot{C}^{\mathrm{M}}_{\mathrm{in}}
+            + \dot{C}^{\mathrm{CH}}_{\mathrm{in}}\right)
+            - \sum_{\mathrm{out}} \left(\dot{C}^{\mathrm{T}}_{\mathrm{out}}
+            + \dot{C}^{\mathrm{M}}_{\mathrm{out}}
+            + \dot{C}^{\mathrm{CH}}_{\mathrm{out}}\right)
+            + \dot{Z}
+            = 0
+
+        The product is defined as the outlet stream. The fuel consists of all inlet
+        streams, with specific treatment depending on temperature levels. The cost
+        balance is closed using:
+
+        .. math::
+            \dot{C}_{\mathrm{P}} = \dot{C}_{\mathrm{F}} + \dot{Z}
+
+        **Case 1: Outlet above ambient temperature**
+
+        When :math:`T_{\mathrm{out}} > T_0`:
+
+        For cold inlets (:math:`T_{\mathrm{in}} < T_{\mathrm{out}}`):
+
+        .. math::
+            \dot{C}_{\mathrm{F,cold}} = \dot{C}^{\mathrm{M}}_{\mathrm{in}}
+            + \dot{C}^{\mathrm{CH}}_{\mathrm{in}}
+
+        For hot inlets (:math:`T_{\mathrm{in}} \geq T_{\mathrm{out}}`):
+
+        .. math::
+            \dot{C}_{\mathrm{F,hot}} = -\dot{m}_{\mathrm{in}} \cdot c^{\mathrm{T}}_{\mathrm{in}}
+            \cdot e^{\mathrm{T}}_{\mathrm{in}}
+            + \left(\dot{C}^{\mathrm{T}}_{\mathrm{in}}
+            + \dot{C}^{\mathrm{M}}_{\mathrm{in}}
+            + \dot{C}^{\mathrm{CH}}_{\mathrm{in}}\right)
+
+        Total fuel cost:
+
+        .. math::
+            \dot{C}_{\mathrm{F}} = \sum \dot{C}_{\mathrm{F,cold}}
+            + \sum \dot{C}_{\mathrm{F,hot}}
+            - \dot{C}^{\mathrm{M}}_{\mathrm{out}}
+            - \dot{C}^{\mathrm{CH}}_{\mathrm{out}}
+
+        **Case 2: Outlet at ambient temperature (dissipative)**
+
+        When :math:`|T_{\mathrm{out}} - T_0| < 10^{-6}`:
+
+        .. math::
+            \dot{C}_{\mathrm{F}} = \sum_{\mathrm{in}} \dot{C}^{\mathrm{TOT}}_{\mathrm{in}}
+
+        **Case 3: Outlet below ambient temperature**
+
+        When :math:`T_{\mathrm{out}} < T_0`:
+
+        For hot inlets (:math:`T_{\mathrm{in}} > T_{\mathrm{out}}`):
+
+        .. math::
+            \dot{C}_{\mathrm{F,hot}} = \dot{C}^{\mathrm{M}}_{\mathrm{in}}
+            + \dot{C}^{\mathrm{CH}}_{\mathrm{in}}
+
+        For cold inlets (:math:`T_{\mathrm{in}} \leq T_{\mathrm{out}}`):
+
+        .. math::
+            \dot{C}_{\mathrm{F,cold}} = -\dot{m}_{\mathrm{in}} \cdot c^{\mathrm{T}}_{\mathrm{in}}
+            \cdot e^{\mathrm{T}}_{\mathrm{in}}
+            + \left(\dot{C}^{\mathrm{T}}_{\mathrm{in}}
+            + \dot{C}^{\mathrm{M}}_{\mathrm{in}}
+            + \dot{C}^{\mathrm{CH}}_{\mathrm{in}}\right)
+
+        Total fuel cost:
+
+        .. math::
+            \dot{C}_{\mathrm{F}} = \sum \dot{C}_{\mathrm{F,hot}}
+            + \sum \dot{C}_{\mathrm{F,cold}}
+            - \dot{C}^{\mathrm{M}}_{\mathrm{out}}
+            - \dot{C}^{\mathrm{CH}}_{\mathrm{out}}
+
+        **Calculated exergoeconomic indicators:**
+
+        .. math::
+            c_{\mathrm{F}} = \frac{\dot{C}_{\mathrm{F}}}{\dot{E}_{\mathrm{F}}}
+
+        .. math::
+            c_{\mathrm{P}} = \frac{\dot{C}_{\mathrm{P}}}{\dot{E}_{\mathrm{P}}}
+
+        .. math::
+            \dot{C}_{\mathrm{D}} = c_{\mathrm{F}} \cdot \dot{E}_{\mathrm{D}}
+
+        .. math::
+            r = \frac{c_{\mathrm{P}} - c_{\mathrm{F}}}{c_{\mathrm{F}}}
+
+        .. math::
+            f = \frac{\dot{Z}}{\dot{Z} + \dot{C}_{\mathrm{D}}}
 
         Parameters
         ----------
         T0 : float
-            Ambient temperature
+            Ambient temperature (K).
         chemical_exergy_enabled : bool, optional
             If True, chemical exergy is considered in the calculations.
+            Default is False.
+
+        Attributes Set
+        --------------
+        C_P : float
+            Cost rate of product (currency/time).
+        C_F : float
+            Cost rate of fuel (currency/time).
+        c_P : float
+            Specific cost of product (currency/energy).
+        c_F : float
+            Specific cost of fuel (currency/energy).
+        C_D : float
+            Cost rate of exergy destruction (currency/time).
+        r : float
+            Relative cost difference (dimensionless).
+        f : float
+            Exergoeconomic factor (dimensionless).
 
         Notes
         -----
-        The exergoeconomic balance considers thermal (T), chemical (CH),
-        and mechanical (M) exergy components for the inlet and outlet streams.
+        The deaerator treats thermal, mechanical, and chemical exergy components
+        differently depending on whether inlets are "hot" or "cold" relative to
+        the outlet temperature. The distinction ensures proper cost allocation
+        for streams that provide heating versus those being heated.
+
+        Future development may include merging profits from dissipative components.
         """
         self.C_P = 0
         self.C_F = 0
