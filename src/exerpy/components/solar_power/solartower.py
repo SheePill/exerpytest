@@ -83,10 +83,11 @@ class SolarTower(Component):
         inlet = self.inl[0]
         outlet = self.outl[0]
         logic_inlet = self.logic_inl[0]
+        
     
         # For solar tower, Q comes from the logic inlet (solar energy input)
-        #Q = logic_inlet['Q']  # Solar heat input from heliostat field
-        #Q = outlet['m'] * outlet['h'] - inlet['m'] * inlet['h']
+        Q = logic_inlet['Q']  # Solar heat input from heliostat field
+        Q = outlet['m'] * outlet['h'] - inlet['m'] * inlet['h']
 
         # Initialize E_P and E_F
         self.E_P = 0.0

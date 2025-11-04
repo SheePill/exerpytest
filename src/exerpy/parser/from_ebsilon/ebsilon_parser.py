@@ -547,6 +547,37 @@ class EbsilonModelParser:
                     else None
                 ),
                 "energy_flow_1_unit": fluid_property_data["heat"]["SI_unit"],
+                'Q_Solar': (
+                    convert_to_SI(
+                        'heat',
+                        comp_cast.QSOLAR.Value,
+                        unit_id_to_string.get(comp_cast.QSOLAR.Dimension, "Unknown")
+                    ) if hasattr(comp_cast, 'QSOLAR') and comp_cast.QSOLAR.Value is not None else None
+                ),
+                'QLOSS': (
+                    convert_to_SI(
+                        'heat',
+                        comp_cast.QLOSS.Value,
+                        unit_id_to_string.get(comp_cast.QLOSS.Dimension, "Unknown")
+                    ) if hasattr(comp_cast, 'QLOSS') and comp_cast.QLOSS.Value is not None else None 
+                ),
+                'QEFF': (
+                    convert_to_SI(
+                        'heat',
+                        comp_cast.QEFF.Value,
+                        unit_id_to_string.get(comp_cast.QEFF.Dimension, "Unknown")
+                    ) if hasattr(comp_cast, 'QEFF') and comp_cast.QEFF.Value is not None else None
+                ),
+                'RQINC': (
+                    convert_to_SI( 
+                        'heat',
+                        comp_cast.RQINC.Value,
+                        unit_id_to_string.get(comp_cast.RQINC.Dimension, "Unknown")
+                    ) if hasattr(comp_cast, 'RQINC') and comp_cast.RQINC.Value is not None else None
+                ),
+                'NBRANCH': (
+                    comp_cast.NBRANCH.Value if hasattr(comp_cast, "NBRANCH") and comp_cast.NBRANCH.Value is not None else None
+                ),
             }
 
             # Determine the group for the component based on its type

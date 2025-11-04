@@ -917,11 +917,16 @@ grouped_components = {
     "Deaerator": [9, 63],
     "SimpleHeatExchanger": [15, 16, 35],
     "SteamGenerator": [5],
-    "Mixer": [3, 28, 37, 38, 49, 60, 102, 141, 161],
+    "Mixer": [3, 28, 37, 38, 49, 60, 102, 141, 161, 115],
     "FlashTank": [34],
     "Storage": [118],
-    "Splitter": [4, 17, 18, 19, 52, 109, 140, 157],
+    "Splitter": [4, 17, 18, 19, 52, 109, 140, 157,114],
     "CycleCloser": [80],
+    "ParabolicTrough":[113],
+    #"DistributingHeader":[114],
+    #"CollectingHeader":[115],
+    "Heliostat Field":[121],
+    "Solar Tower Receiver":[120],
 }
 """
 This is the mapping of component groups to their respective component IDs:

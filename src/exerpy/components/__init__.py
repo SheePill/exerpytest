@@ -17,3 +17,8 @@ from .power_machines.motor import Motor
 from .turbomachinery.compressor import Compressor
 from .turbomachinery.pump import Pump
 from .turbomachinery.turbine import Turbine
+from .solar_power.parabolictrough import ParabolicTrough
+#from .nodes.distributing_header import DistributingHeader
+#from .nodes.collecting_header import CollectingHeader
+from .solar_power.heliostatfield import Heliostatfield
+from .solar_power.solartower import SolarTower
