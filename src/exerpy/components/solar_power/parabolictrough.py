@@ -31,9 +31,13 @@ class ParabolicTrough(Component):
         self.Q_eff = kwargs.get('QEFF', None)
         if self.Q_eff is None:
             logging.warning("QEFF not provided for Parabolic Trough component.")
-        self.Loop = kwargs.get('NBRANCH', None)
-        if self.Loop is None:
+        
+        # Extract NBRANCH value from heat flux connection and store as beta
+        self.beta = kwargs.get('NBRANCH', None)
+        if self.beta is None:
             logging.warning("NBRANCH not provided for Parabolic Trough component.")
+        print(f"[DEBUG] Parabolic Trough '{self.name}' initialized with NBRANCH={self.beta}")
+        
 
     def calc_exergy_balance(self, T0: float, p0: float, split_physical_exergy) -> None:
         r"""
@@ -60,11 +64,6 @@ class ParabolicTrough(Component):
         # Extract inlet and outlet streams
         inlet = self.inl[0]
         outlet = self.outl[0]
-
-
-        
-
-
         # Solar exergy calculations
         # The sun's surface temperature [K]
         T_SUN = 5778
@@ -73,19 +72,19 @@ class ParabolicTrough(Component):
         alpha = 1 - (4/3) * (T0 / T_SUN)
 
         # Calculate exergy of incoming Heat
-        self.E_Solar = self.Q_Solar * alpha  # Total incoming solar exergy
+        self.E_Solar = self.Q_Solar * alpha * self.beta # Total incoming solar exergy
         #self.E_loss = self.Q_Loss * alpha    # Exergy losses from radiation
-        self.E_eff = self.Q_eff * alpha     # Effective solar exergy
+        self.E_eff = self.Q_eff * alpha   # Effective solar exergy
 
         # Case 1: Both inlet and outlet above ambient (normal operation)
         if inlet['T'] >= T0 and outlet['T'] >= T0:
             if split_physical_exergy:
                 # Product is the increase in physical exergy
-                self.E_P = outlet['m'] * (outlet['e_PH'] - inlet['e_PH'])
+                self.E_P = self.beta * outlet['m'] * (outlet['e_PH'] - inlet['e_PH'])
                 self.E_F = self.E_Solar
             else:
                 # Product is the increase in physical exergy
-                self.E_P = outlet['m'] * (outlet['e_PH'] - inlet['e_PH'])
+                self.E_P = self.beta * outlet['m'] * (outlet['e_PH'] - inlet['e_PH'])
                 #self.E_F = outlet['m'] * (outlet['e_PH'] - inlet['e_PH'])
                 self.E_F = self.E_Solar
         

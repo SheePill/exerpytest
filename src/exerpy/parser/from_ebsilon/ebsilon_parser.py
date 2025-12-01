@@ -582,7 +582,11 @@ class EbsilonModelParser:
                     ) if hasattr(comp_cast, 'RQINC') and comp_cast.RQINC.Value is not None else None
                 ),
                 'NBRANCH': (
-                    comp_cast.NBRANCH.Value if hasattr(comp_cast, "NBRANCH") and comp_cast.NBRANCH.Value is not None else None
+                    comp_cast.NBRANCH.Value if hasattr(comp_cast, "NBRANCH") and hasattr(comp_cast.NBRANCH, "Value") and comp_cast.NBRANCH.Value is not None 
+                    else (comp_cast.RNBRANCH.Value if hasattr(comp_cast, "RNBRANCH") and hasattr(comp_cast.RNBRANCH, "Value") and comp_cast.RNBRANCH.Value is not None else None)
+                ),
+                'RNBRANCH': (
+                    comp_cast.RNBRANCH.Value if hasattr(comp_cast, "RNBRANCH") and hasattr(comp_cast.RNBRANCH, "Value") and comp_cast.RNBRANCH.Value is not None else None
                 ),
             }
 
@@ -743,6 +747,8 @@ class EbsilonModelParser:
         After all real connections are parsed, uses stored heat flux parameters
         and existing connections_data to generate and insert heat connections.
 
+        For parabolic trough (type_index 113), retrieves NBRANCH from connected header components (114 or 115).
+
         Returns
         -------
         None
@@ -751,7 +757,31 @@ class EbsilonModelParser:
             name = raw.get("name")
             q_raw = raw.get("Q_Solar")
             q_unit = raw.get("Q_Solar_unit")
+            kind = raw.get("kind")
+            type_index = kind - 10000 if kind is not None else None
             prefix = f"{name}"
+
+            # Retrieve NBRANCH from connected header components for parabolic trough (type_index 113)
+            nbranch = None
+            if type_index == 113:
+                # Find connections that have this parabolic trough as source or target
+                for conn_name, conn_data in self.connections_data.items():
+                    if conn_data.get("source_component") == name or conn_data.get("target_component") == name:
+                        # Find the connected component (header)
+                        connected_comp = conn_data.get("target_component") if conn_data.get("source_component") == name else conn_data.get("source_component")
+                        connected_type = conn_data.get("target_component_type") if conn_data.get("source_component") == name else conn_data.get("source_component_type")
+                        
+                        # Check if the connected component is a header (114 or 115)
+                        if connected_type in (114, 115):
+                            # Find the header component in components_data
+                            for group in self.components_data.values():
+                                comp = group.get(connected_comp)
+                                if comp and "NBRANCH" in comp and comp["NBRANCH"] is not None:
+                                    nbranch = comp["NBRANCH"]
+                                    #print(f"[DEBUG] Found NBRANCH={nbranch} from connected header component '{connected_comp}' (type {connected_type})")
+                                    break
+                            if nbranch is not None:
+                                break
 
             # Try to convert provided Q_Solar to SI, but if it's already an SI value
             # or conversion fails, fall back to using the raw numeric value.
@@ -759,7 +789,13 @@ class EbsilonModelParser:
             if q_raw is not None:
                 try:
                     energy_flow = convert_to_SI("heat", q_raw, q_unit)
-                except Exception:
+                    # For parabolic trough (type_index 113), multiply by NBRANCH if available
+                    if type_index == 113 and nbranch is not None:
+                        #print(f"[DEBUG] Multiplying energy_flow for '{name}': {energy_flow} * {nbranch}")
+                        energy_flow = energy_flow * nbranch
+                        #print(f"[DEBUG] Result: {energy_flow}")
+                except Exception as e:
+                    print(f"[DEBUG] Exception during energy_flow calculation for '{name}': {e}")
                     energy_flow = q_raw
 
             # Compute exergy for concentrated solar if ambient temperature is known
@@ -775,7 +811,7 @@ class EbsilonModelParser:
                 "kind": "heat",
                 "source_component": name,
                 "target_component": None,
-                "source_component_type": (raw.get("kind") - 10000) if raw.get("kind") is not None else None,
+                "source_component_type": type_index,
                 "target_component_type": None,
                 "source_connector": None,
                 "target_connector": None,
@@ -783,8 +819,18 @@ class EbsilonModelParser:
                 "energy_flow_unit": fluid_property_data["heat"]["SI_unit"],
                 "E": computed_exergy,
                 "E_unit": fluid_property_data["power"]["SI_unit"],
+                "NBRANCH": nbranch,
             }
             self.connections_data[prefix] = new_conn
+            
+            # For parabolic trough (type_index 113), also update the component data with NBRANCH
+            if type_index == 113 and nbranch is not None:
+                # Find the component group and update the component's NBRANCH value
+                for group in self.components_data.values():
+                    if name in group:
+                        group[name]["NBRANCH"] = nbranch
+                        #print(f"[DEBUG] Updated component '{name}' with NBRANCH={nbranch}")
+                        break
 
     def get_sorted_data(self) -> dict[str, Any]:
         """
