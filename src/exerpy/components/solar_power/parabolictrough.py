@@ -36,7 +36,7 @@ class ParabolicTrough(Component):
         self.beta = kwargs.get('NBRANCH', None)
         if self.beta is None:
             logging.warning("NBRANCH not provided for Parabolic Trough component.")
-        print(f"[DEBUG] Parabolic Trough '{self.name}' initialized with NBRANCH={self.beta}")
+        
         
 
     def calc_exergy_balance(self, T0: float, p0: float, split_physical_exergy) -> None:

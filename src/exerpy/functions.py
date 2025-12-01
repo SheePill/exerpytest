@@ -335,7 +335,7 @@ def add_total_exergy_flow(my_json, split_physical_exergy):
     for conn_name, conn_data in my_json["connections"].items():
         try:
             # If E is already provided by the parser (e.g., synthetic heat connections with solar exergy),
-            # preserve it and skip recalculation to avoid overwriting valid values.
+            # preserve it and skip recalculation to avoid overwriting valid values. Hier Fragen ob das so ok ist.
             if conn_data.get("E") is not None:
                  conn_data.setdefault("E_unit", fluid_property_data["power"]["SI_unit"])
                  continue

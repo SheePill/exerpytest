@@ -34,6 +34,10 @@ class Splitter(Component):
     def __init__(self, **kwargs):
         r"""Initialize splitter component with given parameters."""
         super().__init__(**kwargs)
+        # Extract NBRANCH value from heat flux connection and store as beta
+        self.beta = kwargs.get('NBRANCH', None)
+        if self.beta is None:
+            logging.warning("NBRANCH not provided for Parabolic Trough component.")
 
     def calc_exergy_balance(self, T0: float, p0: float, split_physical_exergy) -> None:
         r"""
@@ -61,7 +65,10 @@ class Splitter(Component):
         outlet_list = list(self.outl.values())
         inlet_list = list(self.inl.values())
         E_in = sum(inlet.get("m", 0) * inlet.get("e_PH") for inlet in inlet_list)
-        E_out = sum(outlet.get("m", 0) * outlet.get("e_PH") for outlet in outlet_list)
+        if self.beta is not None:
+            E_out = sum(outlet.get("m", 0) * outlet.get("e_PH") * self.beta for outlet in outlet_list)
+        else:
+            E_out = sum(outlet.get("m", 0) * outlet.get("e_PH") for outlet in outlet_list)
         self.E_P = np.nan
         self.E_F = np.nan
         self.E_D = E_in - E_out
