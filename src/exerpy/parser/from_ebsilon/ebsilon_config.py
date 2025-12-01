@@ -925,8 +925,8 @@ grouped_components = {
     "ParabolicTrough":[113],
     #"DistributingHeader":[114],
     #"CollectingHeader":[115],
-    "Heliostat Field":[121],
-    "Solar Tower Receiver":[120],
+    "Heliostatfield":[121],
+    "SolarTower":[120]
 }
 """
 This is the mapping of component groups to their respective component IDs:
@@ -1158,5 +1158,20 @@ connector_mapping = {
     118: {  # Storage
         1: 0,  # Inlet
         2: 0,  # Outlet
+    },
+    120: {  # Solar Tower Receiver
+        1: 0,  # Inlet fluid
+        2: 0,  # Outlet fluid
+        3: 1,  # Solar heat input connection to Heliostatfield
+    },
+    121: {  # Heliostat Field
+        1: 0,  # Outlet Link to receiver
+        2: 0,  # Inlet Link Limit input
+        3: 1,  # Heatflux input
+    },
+    113: {  # Parabolic Trough Collector
+        1: 0,  # Inlet fluid
+        2: 0,  # Outlet fluid
+        3: 1,  # Solar heat input connection
     },
 }

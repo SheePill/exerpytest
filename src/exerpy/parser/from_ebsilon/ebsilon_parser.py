@@ -81,6 +81,7 @@ class EbsilonModelParser:
         self.pamb: float | None = None  # Ambient pressure
 
         self._storages_to_postprocess: list[dict[str, Any]] = []
+        self.heatflux_to_postprocess: list[dict[str, Any]] = []
 
     @require_ebsilon
     def initialize_model(self):
@@ -176,6 +177,11 @@ class EbsilonModelParser:
 
             # After parsing all components and connections, create storage connections
             self._create_storage_connections()
+            # create Heatflux connections for Solartower or parabolic components
+            try:
+                self._create_heatflux_connections()
+            except Exception:
+                logging.warning("_create_heatflux_connections failed; continuing without synthetic heat connections")
 
         except Exception as e:
             logging.error(f"Error while parsing the model: {e}")
@@ -198,8 +204,8 @@ class EbsilonModelParser:
         non_material_fluids = {5, 6, 9, 10, 13}  # Scheduled, Actual, Electric, Shaft, Logic
         non_energetic_fluids = {5, 6}  # Scheduled, Actual
         power_fluids = {9, 10}  # Electric, Shaft
-        logic_fluids = 13  # Logic "fluids" for heat and power flows
-        heat_components = {5, 15, 16, 35}  # Components that handle with heat flows as input or output
+        logic_fluids = {13}  # Logic "fluids" for heat and power flows
+        heat_components = {5, 15, 16, 35, 120, 121, 113}  # Components that handle with heat flows as input or output
         power_components = {31}  # Power-summerized with power flows ONLY as output
 
         # ALL EBSILON CONNECTIONS
@@ -372,7 +378,7 @@ class EbsilonModelParser:
                     }
 
             # HEAT AND POWER CONNECTIONS from Logic "fluids"
-            if (pipe_cast.Kind - 1000) == logic_fluids:
+            if (pipe_cast.Kind - 1000) in logic_fluids: #Here I changed == to in logic_fluids
                 if (comp0 is not None and comp0.Kind is not None and comp0.Kind - 10000 in heat_components) or (
                     comp1 is not None and comp1.Kind is not None and comp1.Kind - 10000 in heat_components
                 ):
@@ -554,13 +560,13 @@ class EbsilonModelParser:
                         unit_id_to_string.get(comp_cast.QSOLAR.Dimension, "Unknown")
                     ) if hasattr(comp_cast, 'QSOLAR') and comp_cast.QSOLAR.Value is not None else None
                 ),
-                'QLOSS': (
-                    convert_to_SI(
-                        'heat',
-                        comp_cast.QLOSS.Value,
-                        unit_id_to_string.get(comp_cast.QLOSS.Dimension, "Unknown")
-                    ) if hasattr(comp_cast, 'QLOSS') and comp_cast.QLOSS.Value is not None else None 
-                ),
+                # 'QLOSS': (
+                #     convert_to_SI(
+                #         'heat',
+                #         comp_cast.QLOSS.Value,
+                #         unit_id_to_string.get(comp_cast.QLOSS.Dimension, "Unknown")
+                #     ) if hasattr(comp_cast, 'QLOSS') and comp_cast.QLOSS.Value is not None else None 
+                #),
                 'QEFF': (
                     convert_to_SI(
                         'heat',
@@ -630,6 +636,42 @@ class EbsilonModelParser:
                     "h_storage_unit": unit_id_to_string.get(storage.HNEW.Dimension, "Unknown"),
                 }
             )
+        #Handle heliostat field components 121 and parabolic trough 113 for heat flux extraction
+        if type_index in (121, 113):
+            heatflux = None
+            try:
+                # Cast to the appropriate component type based on type_index !!!
+                if type_index == 121:
+                    heatflux = self.oc.CastToComp121(obj)
+                elif type_index == 113:
+                    heatflux = self.oc.CastToComp113(obj)
+            except Exception as e:
+                logging.warning(f"Failed to cast component to type {type_index}: {e}")
+                heatflux = None
+
+            # Append only when cast succeeded and QSOLAR is available
+            if (
+                heatflux is not None
+                and hasattr(heatflux, "QSOLAR")
+                and heatflux.QSOLAR is not None
+                and getattr(heatflux.QSOLAR, "Value", None) is not None
+            ):
+                # Convert to SI immediately (consistent with component_data earlier)
+                q_solar_val = convert_to_SI(
+                    "heat",
+                    heatflux.QSOLAR.Value,
+                    unit_id_to_string.get(heatflux.QSOLAR.Dimension, "Unknown"),
+                )
+                q_solar_unit = fluid_property_data["heat"]["SI_unit"]
+
+                self.heatflux_to_postprocess.append(
+                    {
+                        "name": heatflux.Name,
+                        "kind": heatflux.Kind,
+                        "Q_Solar": q_solar_val,
+                        "Q_Solar_unit": q_solar_unit,
+                    }
+                )
 
     def _create_storage_connections(self):
         """
@@ -692,6 +734,55 @@ class EbsilonModelParser:
                     ),
                     None,
                 ),
+            }
+            self.connections_data[prefix] = new_conn
+    def _create_heatflux_connections(self):
+        """
+        Create fictive heat flow connections for heat flux components like Heliostat Field or Parabolic Trough Field.
+
+        After all real connections are parsed, uses stored heat flux parameters
+        and existing connections_data to generate and insert heat connections.
+
+        Returns
+        -------
+        None
+        """
+        for raw in self.heatflux_to_postprocess:
+            name = raw.get("name")
+            q_raw = raw.get("Q_Solar")
+            q_unit = raw.get("Q_Solar_unit")
+            prefix = f"{name}"
+
+            # Try to convert provided Q_Solar to SI, but if it's already an SI value
+            # or conversion fails, fall back to using the raw numeric value.
+            energy_flow = None
+            if q_raw is not None:
+                try:
+                    energy_flow = convert_to_SI("heat", q_raw, q_unit)
+                except Exception:
+                    energy_flow = q_raw
+
+            # Compute exergy for concentrated solar if ambient temperature is known
+            # alpha = 1 - (4/3 * Tamb / Tsun) Ahrendts 1988
+            computed_exergy = None
+            if energy_flow is not None and self.Tamb is not None:
+                T_SUN = 5778  # Sun's surface temperature in K
+                alpha = 1.0 - (4.0 / 3.0) * (self.Tamb / T_SUN)
+                computed_exergy = energy_flow * alpha
+            
+            new_conn = {
+                "name": prefix,
+                "kind": "heat",
+                "source_component": name,
+                "target_component": None,
+                "source_component_type": (raw.get("kind") - 10000) if raw.get("kind") is not None else None,
+                "target_component_type": None,
+                "source_connector": None,
+                "target_connector": None,
+                "energy_flow": energy_flow,
+                "energy_flow_unit": fluid_property_data["heat"]["SI_unit"],
+                "E": computed_exergy,
+                "E_unit": fluid_property_data["power"]["SI_unit"],
             }
             self.connections_data[prefix] = new_conn
 

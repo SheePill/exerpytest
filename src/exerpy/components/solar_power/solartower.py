@@ -38,6 +38,7 @@ class SolarTower(Component):
         Initializes the SolarTower component.
         """
         super().__init__(**kwargs)
+        self.F = None
 
     def calc_exergy_balance(self, T0: float, p0: float, split_physical_exergy) -> None:
         r"""
@@ -74,69 +75,64 @@ class SolarTower(Component):
         where :math:`\dot{m}` is the mass flow rate and :math:`e` is the specific exergy of the streams.
         """
         # Validate the number of inlets and outlets
-        if not hasattr(self, 'inl') or not hasattr(self, 'outl') or not hasattr(self, 'logic_inl') or len(self.inl) != 1 or len(self.outl) != 1 or len(self.logic_inl) != 1:
-            msg = "SolarTower requires exactly one inlet, one outlet, and one logic inlet to Heliostatfield."
+        if not hasattr(self, 'inl') or not hasattr(self, 'outl') or len(self.outl) != 1:
+            msg = "SolarTower requires at least one inlet and exactly one outlet."
             logging.error(msg)
             raise ValueError(msg)
-    
-        # Extract inlet, outlet streams and one logic inlet
+        
+        if len(self.inl) < 1:
+            msg = "SolarTower requires at least one inlet stream."
+            logging.error(msg)
+            raise ValueError(msg)
+
+        # Extract inlet and outlet streams
         inlet = self.inl[0]
         outlet = self.outl[0]
-        logic_inlet = self.logic_inl[0]
         
-    
-        # For solar tower, Q comes from the logic inlet (solar energy input)
-        Q = logic_inlet['Q']  # Solar heat input from heliostat field
-        Q = outlet['m'] * outlet['h'] - inlet['m'] * inlet['h']
+        # Extract solar heat input from logic connection (inlet[1])
+        if 1 in self.inl and self.inl[1] is not None:
+            logic_inlet = self.inl[1]
+            # Check if this is a heat connection with energy data
+            if logic_inlet.get("kind") == "heat":
+                # Try to get energy value from E or energy_flow fields
+                self.F = logic_inlet.get("E") or logic_inlet.get("energy_flow")
+                if self.F is None:
+                    print(f"DEBUG: Warning - Logic connection missing energy data. Keys: {list(logic_inlet.keys())}")
+        
+        if self.F is None:
+            print(f"DEBUG: Error - No valid solar heat input found, F is still None")
 
-        # Initialize E_P and E_F
-        self.E_P = 0.0
-        self.E_F = 0.0
-
-        # Case 1: Heat is added to the system (Q > 0)
-        if Q > 0:
-            if inlet['T'] >= T0 and outlet['T'] >= T0:
-                if split_physical_exergy:
-                    self.E_P = outlet['m'] * (outlet['e_PH'] - inlet['e_PH'])
-                    self.E_F = logic_inlet['Q']  # Solar heat input
-                else:
-                    self.E_P = outlet['m'] * (outlet['e_PH'] - inlet['e_PH'])
-                    self.E_F = logic_inlet['Q']  
-            
-            elif inlet['T'] < T0 and outlet['T'] > T0:
-                if split_physical_exergy:
-                    self.E_P = outlet['m'] * (outlet['e_T'] + inlet['e_T'])
-                    self.E_F = logic_inlet['Q']
-                else:
-                    self.E_P = outlet['m'] * (outlet['e_PH'] - inlet['e_PH'])
-                    self.E_F = logic_inlet['Q']
-
-            elif inlet['T'] < T0 and outlet['T'] < T0:
-                logging.warning(
-                    "The inlet and outlet temperatures are both below ambient (T_in < T0 and T_out < T0). This case is not typically expected for a Solar Tower."
-                )
-                self.E_P = np.nan
-                self.E_F = np.nan
-            else:
-                logging.warning(
-                    "SolarTower: unimplemented case (Q > 0, T_in > T0 > T_out?)."
-                )
-                self.E_P = np.nan
-                self.E_F = outlet['m'] * (inlet['e_PH'] - outlet['e_PH'])
-
-        # Case 2: No heat addition (Q <= 0)
+        # # Solar exergy calculations
+        # # The sun's surface temperature [K]
+        # T_SUN = 5778
+        # #calculate Q reduction factor for exergy calculations
+        # # E = Q * (1 - 4/3 * T_ambient/T_sun)
+        # alpha = 1 - (4/3) * (T0 / T_SUN)
+        # self.F = self.F
+        
+       # Case 1: Both inlet and outlet above ambient (normal operation)
+        if split_physical_exergy:
+                # Product is the increase in physical exergy
+                self.E_P = outlet['m'] * (outlet['e_PH'] - inlet['e_PH'])
+                self.E_F = abs(self.F)
         else:
-            logging.warning("SolarTower: No solar heat input (Q <= 0).")
-            self.E_P = np.nan
-            self.E_F = np.nan
-
-        #Case 3: Solar Tower with steam
-
+                # Product is the increase in physical exergy
+                self.E_P = outlet['m'] * (outlet['e_PH'] - inlet['e_PH'])
+                self.E_F = abs(self.F)
+                
+        
         # Calculate exergetic efficiency
         self.epsilon = self.calc_epsilon()
-
+        
         # Calculate exergy destruction 
         if not np.isnan(self.E_P):
             self.E_D = self.E_F - self.E_P
         else:
             self.E_D = self.E_F
+        
+        # Log the results
+        logging.info(
+            f"Solar Tower exergy balance calculated: "
+            f"E_P={self.E_P:.2f}, E_F={self.E_F:.2f}, E_D={self.E_D:.2f}, "
+            f"Efficiency={self.epsilon:.2%}"
+        )    

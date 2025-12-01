@@ -334,6 +334,12 @@ def add_total_exergy_flow(my_json, split_physical_exergy):
     """
     for conn_name, conn_data in my_json["connections"].items():
         try:
+            # If E is already provided by the parser (e.g., synthetic heat connections with solar exergy),
+            # preserve it and skip recalculation to avoid overwriting valid values.
+            if conn_data.get("E") is not None:
+                 conn_data.setdefault("E_unit", fluid_property_data["power"]["SI_unit"])
+                 continue
+            
             if conn_data["kind"] == "material":
                 # For material connections: E = m * (e^PH + e^CH)
                 conn_data["E_PH"] = conn_data["m"] * conn_data["e_PH"]
@@ -439,6 +445,10 @@ def add_total_exergy_flow(my_json, split_physical_exergy):
                         logging.warning(
                             f"Not enough material connections for steam generator {comp_name} for heat exergy calculation."
                         )
+                # The exergy for the incoming heatflux should be calculated here instead of in the parser.
+                #elif "Heliostatfield" in my_json["components"] and comp_name in my_json["components"]["Heliostatfield"]:
+
+
                 else:
                     conn_data["E"] = None
                     logging.warning(

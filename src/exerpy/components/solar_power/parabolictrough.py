@@ -25,12 +25,15 @@ class ParabolicTrough(Component):
         self.Q_Solar = kwargs.get('Q_Solar', None)
         if self.Q_Solar is None:
             logging.warning("Q_Solar not provided for Parabolic Trough component.")
-        self.Q_Loss = kwargs.get('QLOSS', None)
-        if self.Q_Loss is None:
-            logging.warning("QLOSS not provided for Parabolic Trough component.")
+        #self.Q_Loss = kwargs.get('QLOSS', None)
+        #if self.Q_Loss is None:
+            #logging.warning("QLOSS not provided for Parabolic Trough component.")
         self.Q_eff = kwargs.get('QEFF', None)
         if self.Q_eff is None:
             logging.warning("QEFF not provided for Parabolic Trough component.")
+        self.Loop = kwargs.get('NBRANCH', None)
+        if self.Loop is None:
+            logging.warning("NBRANCH not provided for Parabolic Trough component.")
 
     def calc_exergy_balance(self, T0: float, p0: float, split_physical_exergy) -> None:
         r"""
@@ -38,18 +41,29 @@ class ParabolicTrough(Component):
         """
         
         # Validate the number of inlets and outlets
-        if not hasattr(self, 'inl') or not hasattr(self, 'outl') or len(self.inl) != 1 or len(self.outl) != 1:
-            msg = "Parabolic Trough requires exactly one inlet and one outlet."
+        if not hasattr(self, 'inl') or not hasattr(self, 'outl'):
+            msg = "Collector requires two inlet connections and one outlet connection."
             logging.error(msg)
             raise ValueError(msg)
         
-        # Get the first inlet and outlet keys (they might not be 0-based)
-        inlet_key = list(self.inl.keys())[0]
-        outlet_key = list(self.outl.keys())[0]
+        if len(self.inl) != 1:
+            msg = "Collector requires exactly two inlets."
+            logging.error(msg)
+            raise ValueError(msg)
+
+        if len(self.outl) != 2:
+            msg = "Collector requires exactly one outlet."
+            logging.error(msg)
+            raise ValueError(msg)
         
+
         # Extract inlet and outlet streams
-        inlet = self.inl[inlet_key]
-        outlet = self.outl[outlet_key]
+        inlet = self.inl[0]
+        outlet = self.outl[0]
+
+
+        
+
 
         # Solar exergy calculations
         # The sun's surface temperature [K]
@@ -60,7 +74,7 @@ class ParabolicTrough(Component):
 
         # Calculate exergy of incoming Heat
         self.E_Solar = self.Q_Solar * alpha  # Total incoming solar exergy
-        self.E_loss = self.Q_Loss * alpha    # Exergy losses from radiation
+        #self.E_loss = self.Q_Loss * alpha    # Exergy losses from radiation
         self.E_eff = self.Q_eff * alpha     # Effective solar exergy
 
         # Case 1: Both inlet and outlet above ambient (normal operation)

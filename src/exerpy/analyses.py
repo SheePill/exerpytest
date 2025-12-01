@@ -651,7 +651,11 @@ class ExergyAnalysis:
             # Connection is at system boundary if one side is not connected
             if source is None or target is None:
                 kind = conn_data.get("kind", "")
-                exergy = conn_data.get("E", 0)
+                #exergy = conn_data.get("E", 0) #old code
+                # Treat explicit None as zero to avoid TypeError when using abs()# new change to set exergy to zero if none
+                exergy = conn_data.get("E")
+                if exergy is None:
+                     exergy = 0
                 # Only consider material/heat/power streams with significant exergy
                 if kind in ["material", "heat", "power"] and abs(exergy) > 1e-3:
                     system_boundary_conns.append(conn_name)
